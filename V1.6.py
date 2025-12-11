@@ -68,9 +68,9 @@ FONT_FORGOT_PASSWORD = (FONT_FAMILY, 11, "underline")
 FONT_TITLE = (FONT_FAMILY, 14)
 
 MAX_LINHAS_COLUNA = 6
-IDX_AK_LABEL = 36
-IDX_AL_ANEXOS = 37
-IDX_AM_ASSUNTO = 38
+IDX_AJ_LABEL = 35
+IDX_AK_ANEXOS = 36
+IDX_AL_ASSUNTO = 37
 IDX_EMAIL_TO = 32
 IDX_EMAIL_CC = 33
 IDX_F_BLOQUEADA = 5  # Coluna F para verificar "BLOQUEADA"
@@ -629,9 +629,9 @@ def carregar_controle(usuario):
     df = pd.read_excel(caminho_controle, sheet_name=0, engine="openpyxl")
     print(f"Shape do DataFrame: {df.shape}")
     print(f"Colunas disponíveis: {df.columns.tolist()}")
-    if df.shape[1] <= IDX_AK_LABEL:
+    if df.shape[1] <= IDX_AJ_LABEL:
         raise ValueError(
-            f"A planilha tem {df.shape[1]} colunas, mas o código espera pelo menos {IDX_AK_LABEL + 1} colunas.")
+            f"A planilha tem {df.shape[1]} colunas, mas o código espera pelo menos {IDX_AJ_LABEL + 1} colunas.")
     return df
 
 
@@ -2438,12 +2438,12 @@ class App:
 
 
 def get_row_by_label(df, label):
-    if IDX_AK_LABEL >= df.shape[1]:
+    if IDX_AJ_LABEL >= df.shape[1]:
         raise ValueError(
-            f"Índice {IDX_AK_LABEL} fora dos limites. Colunas disponíveis: {df.shape[1]}")
-    mask = df.iloc[:, IDX_AK_LABEL].astype(str) == label
+            f"Índice {IDX_AJ_LABEL} fora dos limites. Colunas disponíveis: {df.shape[1]}")
+    mask = df.iloc[:, IDX_AJ_LABEL].astype(str) == label
     if not mask.any():
-        print(f"Label '{label}' não encontrado na coluna {IDX_AK_LABEL}")
+        print(f"Label '{label}' não encontrado na coluna {IDX_AJ_LABEL}")
         return None
     return df[mask].iloc[0]
 
@@ -2539,9 +2539,9 @@ def enviar_email_procuracao(empresa, df, usuario):
 
 def get_anexos_from_row(row, usuario):
     try:
-        if IDX_AL_ANEXOS >= len(row):
+        if IDX_AK_ANEXOS >= len(row):
             return []
-        raw = str(row.iloc[IDX_AL_ANEXOS])
+        raw = str(row.iloc[IDX_AK_ANEXOS])
     except Exception:
         raw = ""
     if not raw or raw.lower() in {"nan", "none"}:
@@ -2557,19 +2557,19 @@ def get_anexos_from_row(row, usuario):
 
 def get_assunto_from_row(row):
     try:
-        if IDX_AM_ASSUNTO >= len(row):
+        if IDX_AL_ASSUNTO >= len(row):
             return ""
-        raw = str(row.iloc[IDX_AM_ASSUNTO])
+        raw = str(row.iloc[IDX_AL_ASSUNTO])
     except Exception:
         raw = ""
     return safe_email_field(raw)
 
 
 def listar_labels(df):
-    if IDX_AK_LABEL >= df.shape[1]:
+    if IDX_AJ_LABEL >= df.shape[1]:
         raise ValueError(
-            f"Índice {IDX_AK_LABEL} fora dos limites. Colunas disponíveis: {df.shape[1]}")
-    labels = list(df.iloc[2:, IDX_AK_LABEL].dropna().astype(str))
+            f"Índice {IDX_AJ_LABEL} fora dos limites. Colunas disponíveis: {df.shape[1]}")
+    labels = list(df.iloc[2:, IDX_AJ_LABEL].dropna().astype(str))
     labels.sort(key=lambda x: normalize_key(x))
     return labels
 
