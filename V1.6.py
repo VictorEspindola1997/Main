@@ -1217,11 +1217,9 @@ class App:
                     "Erro de Envio", f"Falha ao enviar e-mail para '{empresa}': {err}")
 
             # Atualiza o contador
-            if self.frame_empresas_procuracoes:
-                remaining = len([w for w in self.frame_empresas_procuracoes.winfo_children(
-                ) if isinstance(w, tk.Button)])
-                self.contador_label_procuracoes.config(
-                    text=f"{self.procuracoes_enviadas}/{remaining + self.procuracoes_enviadas}")
+            if self.frame_empresas_procuracoes and self.frame_empresas_procuracoes.winfo_exists():
+                remaining_buttons = len([w for w in self.frame_empresas_procuracoes.winfo_children() if isinstance(w, tk.Button)])
+                self.contador_label_procuracoes.config(text=f"QUANTIDADE DE PROCURAÇÕES VENCIDAS / A VENCER: {remaining_buttons}")
 
         self.root.after(0, ui_update)
 
@@ -1305,7 +1303,7 @@ class App:
 
         self.procuracoes_enviadas = 0
         self.contador_label_procuracoes = tk.Label(
-            frame_top, text=f"0/{len(botoes_a_criar)}", font=FONT_LABEL)
+            frame_top, text=f"QUANTIDADE DE PROCURAÇÕES VENCIDAS / A VENCER: {len(botoes_a_criar)}", font=FONT_LABEL)
         self.contador_label_procuracoes.pack(pady=2)
 
         container = tk.Frame(win)
@@ -2150,7 +2148,7 @@ class App:
             lbl, registros_envio) and not self._has_ok_status(lbl)]
         botoes.sort(key=lambda x: normalize_key(x))
         self.contador_label_envio = tk.Label(
-            frame_top, text=f"RESTA ENVIAR A LISTAGEM PARA {len(botoes)} EMPRESAS", font=FONT_LABEL)
+            frame_top, text=f"QUANTIDADE DE LISTAGENS A SEREM ENVIADAS NESTE MÊS: {len(botoes)}", font=FONT_LABEL)
         self.contador_label_envio.pack(pady=2)
         container = tk.Frame(win)
         container.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -2231,7 +2229,7 @@ class App:
 
             if self.frame_empresas_envio and self.frame_empresas_envio.winfo_exists():
                 remaining_buttons = len([w for w in self.frame_empresas_envio.winfo_children() if isinstance(w, tk.Button)])
-                self.contador_label_envio.config(text=f"RESTA ENVIAR A LISTAGEM PARA {remaining_buttons} EMPRESAS")
+                self.contador_label_envio.config(text=f"QUANTIDADE DE LISTAGENS A SEREM ENVIADAS NESTE MÊS: {remaining_buttons}")
 
         self.root.after(0, ui_update)
 
@@ -2267,7 +2265,7 @@ class App:
 
                 if self.frame_empresas_envio and self.frame_empresas_envio.winfo_exists():
                     remaining_buttons = len([w for w in self.frame_empresas_envio.winfo_children() if isinstance(w, tk.Button)])
-                    self.contador_label_envio.config(text=f"RESTA ENVIAR A LISTAGEM PARA {remaining_buttons} EMPRESAS")
+                    self.contador_label_envio.config(text=f"QUANTIDADE DE LISTAGENS A SEREM ENVIADAS NESTE MÊS: {remaining_buttons}")
             self.root.after(0, ui_update_after_one)
             time.sleep(0.4)
 
@@ -2311,7 +2309,7 @@ class App:
                 registros_cobranca) and lbl not in EXCLUIR_NA_COBRANCA and not self._has_ok_status(lbl)]
         botoes.sort(key=lambda x: normalize_key(x))
         self.contador_label_cobranca = tk.Label(
-            frame_top, text=f"{self.cobrados}/{len(botoes)}", font=FONT_LABEL)
+            frame_top, text=f"QUANTIDADE DE LISTAGENS PENDENTES DE RETORNO HOJE: {len(botoes)}", font=FONT_LABEL)
         self.contador_label_cobranca.pack(pady=2)
         container = tk.Frame(win)
         container.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -2346,8 +2344,6 @@ class App:
             canvas.configure(scrollregion=canvas.bbox("all"))
         frame_empresas.bind("<Configure>", _atualiza_scroll)
         self._bind_horizontal_scroll(canvas)
-        self.contador_label_cobranca.config(
-            text=f"{self.cobrados}/{len(botoes)}")
 
         rodape = tk.Frame(win)
         rodape.pack(side=tk.BOTTOM, fill=tk.X, anchor="sw")
@@ -2392,10 +2388,9 @@ class App:
                 messagebox.showerror(
                     "Erro", f"Falha ao cobrar '{label}': {err}")
 
-            total_inicial = int(
-                self.contador_label_cobranca.cget("text").split('/')[1])
-            self.contador_label_cobranca.config(
-                text=f"{self.cobrados}/{total_inicial}")
+            if self.frame_empresas_cobranca and self.frame_empresas_cobranca.winfo_exists():
+                remaining_buttons = len([w for w in self.frame_empresas_cobranca.winfo_children() if isinstance(w, tk.Button)])
+                self.contador_label_cobranca.config(text=f"QUANTIDADE DE LISTAGENS PENDENTES DE RETORNO HOJE: {remaining_buttons}")
 
         self.root.after(0, ui_update)
 
@@ -2428,10 +2423,9 @@ class App:
                 else:
                     messagebox.showerror(
                         "Erro", f"Falha ao cobrar '{lbl}': {e}")
-                remaining = len([w2 for w2 in self.frame_empresas_cobranca.winfo_children(
-                ) if isinstance(w2, tk.Button)])
-                self.contador_label_cobranca.config(
-                    text=f"{self.cobrados}/{remaining}")
+                if self.frame_empresas_cobranca and self.frame_empresas_cobranca.winfo_exists():
+                    remaining_buttons = len([w for w in self.frame_empresas_cobranca.winfo_children() if isinstance(w, tk.Button)])
+                    self.contador_label_cobranca.config(text=f"QUANTIDADE DE LISTAGENS PENDENTES DE RETORNO HOJE: {remaining_buttons}")
             self.root.after(0, ui_update_after_one)
             time.sleep(0.4)
 
