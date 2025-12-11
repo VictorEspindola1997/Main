@@ -323,7 +323,9 @@ def executar_gerar_planilha(app_usuario, soc_usuario, soc_senha, soc_id, app_ins
             ws.Activate()
 
             # 2. Filtra as linhas de forma eficiente com whitelist dinâmica
-            # Obtém a primeira coluna (A) da planilha de controle e cria a whitelist
+            # GARANTIA: A whitelist é sempre criada dinamicamente a partir da Coluna A
+            # da planilha 'Controle do E-Social.xlsx'. Apenas as empresas listadas
+            # nesta coluna serão mantidas na planilha de pendentes gerada.
             df_controle = app_instance.df
             whitelist_empresas = set(
                 df_controle.iloc[:, 0].dropna().astype(str).str.upper())
