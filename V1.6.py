@@ -27,7 +27,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import speech_recognition as sr
 
 # ================== CONFIGURAÇÕES ==================
 TXT_ULTIMO_ENVIO = "ultimo_salvamento.txt"
@@ -429,7 +428,6 @@ class GerarPlanilhaWindow(tk.Toplevel):
         self.usuario_atual = usuario_atual
         self.app_instance = app_instance
         self.btn_widget = btn_widget
-        app_instance.voice_context = 'gerar_planilha'
         app_instance.gerar_planilha_window = self
 
 
@@ -528,7 +526,6 @@ class GerarPlanilhaWindow(tk.Toplevel):
 
     def on_win_destroy(self):
         self.app_instance.caps_lock_labels.remove(self.caps_lock_tuple)
-        self.app_instance.voice_context = 'main_menu'
         self.app_instance.gerar_planilha_window = None
         self.destroy()
 
@@ -947,15 +944,8 @@ class App:
         self.frame_empresas_procuracoes = None
         self.password_visible = False
         self.show_envio_cobranca_button = True
-        self.listening = False
         self.caps_lock_labels = []
-        self.voice_context = 'main_menu'
         self.gerar_planilha_window = None
-        self.command_popup = None
-        self.command_popup_label = None
-        self.active_voice_window = None
-        self.original_height = 0
-        self.voice_ui_frame = None
 
 
         self._build_login_screen()
@@ -974,85 +964,6 @@ class App:
                 # The cleanup logic should remove it from the list soon.
                 pass
         self.root.after(100, self.check_caps_lock)
-
-    def _activate_command_mode(self):
-        active_window = self.root.focus_get()
-        if isinstance(active_window, tk.Entry):
-            active_window = active_window.winfo_toplevel()
-
-        if not isinstance(active_window, (tk.Tk, tk.Toplevel)):
-             active_window = self.root
-
-        # Create and display the pop-up
-        self.command_popup = tk.Toplevel(active_window)
-        self.command_popup.title("")
-        self.command_popup.resizable(False, False)
-
-        self.command_popup_label = tk.Label(self.command_popup, text="Aguardando comando...", font=FONT_LABEL, padx=20, pady=20)
-        self.command_popup_label.pack()
-
-        self.command_popup.transient(active_window)
-        centralizar_janela(self.command_popup, 400, 100)
-
-        self.active_voice_window = active_window
-        threading.Thread(target=self._persistent_listen_loop, daemon=True).start()
-
-    def _persistent_listen_loop(self):
-        r = sr.Recognizer()
-        mic = sr.Microphone()
-
-        while self.active_voice_window:
-            self.root.after(0, lambda: self.command_popup_label.config(text="Aguardando comando..."))
-            try:
-                with mic as source:
-                    audio = r.listen(source, timeout=5, phrase_time_limit=5)
-
-                command = r.recognize_google(audio, language="pt-BR").lower()
-                print(f"👂 Heard command: '{command}'")
-
-                # Check for the exit command first
-                normalized_command = normalize_key(command)
-                if "sair" in normalized_command and "assistente" in normalized_command:
-                    break
-
-                # We need to schedule the execution on the main thread
-                # and wait for its result. We can use a simple flag.
-                success = [False] # Use a list to make it mutable inside the lambda
-                self.root.after(0, lambda: success.__setitem__(0, self._execute_command(command)))
-
-                # Give the main thread a moment to process the command
-                time.sleep(1)
-
-                if success[0]:
-                    self.root.after(0, lambda: self.command_popup_label.config(text="Comando executado com sucesso!"))
-                    time.sleep(1.5) # Show success message
-                else:
-                    self.root.after(0, lambda: self.command_popup_label.config(text="Comando não reconhecido/encontrado. Tente novamente."))
-                    time.sleep(2) # Show the message for a bit
-
-            except sr.UnknownValueError:
-                self.root.after(0, lambda: self.command_popup_label.config(text="Não entendi o áudio. Tente novamente."))
-                print("Could not understand command.")
-                time.sleep(2)
-            except sr.WaitTimeoutError:
-                self.root.after(0, lambda: self.command_popup_label.config(text="Nenhum comando detectado. Tente novamente."))
-                print("No command detected.")
-                time.sleep(2)
-            except Exception as e:
-                print(f"An unexpected error occurred during command listening: {e}")
-                break # Exit on other errors
-
-        self.root.after(0, self._deactivate_command_mode)
-
-    def _deactivate_command_mode(self):
-        print("Command mode deactivated.")
-        if self.command_popup:
-            try:
-                self.command_popup.destroy()
-            except tk.TclError:
-                pass # Window might already be destroyed
-            self.command_popup = None
-        self.active_voice_window = None
 
     def _build_login_screen(self):
         # This method builds the login UI and can be called multiple times.
@@ -1143,82 +1054,8 @@ class App:
         self.df = pd.DataFrame()
         self.labels = []
         self.show_envio_cobranca_button = True
-        self.listening = False
 
         self._build_login_screen()
-
-    def _listen_for_activation_phrase(self):
-        r = sr.Recognizer()
-        mic = sr.Microphone()
-        with mic as source:
-            r.adjust_for_ambient_noise(source)
-
-        self.listening = True
-        print("🎤 Listening for activation phrase...")
-
-        while self.listening:
-            try:
-                with mic as source:
-                    audio = r.listen(source)
-                phrase = r.recognize_google(audio, language="pt-BR").lower()
-                normalized_phrase = normalize_key(phrase)
-                print(f"👂 Heard: '{phrase}' (Normalized: '{normalized_phrase}')")
-                if "ativar" in normalized_phrase and "comando" in normalized_phrase:
-                    self.root.after(0, self._activate_command_mode)
-            except sr.UnknownValueError:
-                print("Could not understand audio, ignoring.")
-                continue
-            except sr.RequestError as e:
-                print(f"Could not request results from Google Speech Recognition service; {e}")
-                continue
-            except Exception as e:
-                print(f"An unexpected error occurred during activation listening: {e}")
-
-    def _execute_command(self, command):
-        """Executes a voice command by searching for a matching button or special phrase. Returns True if successful, False otherwise."""
-        normalized_command = normalize_key(command)
-
-        # Handle special case shortcuts first
-        if "enviar listagem" in normalized_command:
-            if self._has_envio_actions():
-                self.tela_empresas_envio()
-                return True
-            else:
-                messagebox.showinfo("E.A.I. - AVISO", "NÃO HÁ AÇÕES DE ENVIO DISPONÍVEIS NO MOMENTO.")
-                return False
-
-        if "cobrar listagem" in normalized_command:
-            if self._has_cobranca_actions():
-                self.tela_empresas_cobranca()
-                return True
-            else:
-                messagebox.showinfo("E.A.I. - AVISO", "NÃO HÁ AÇÕES DE COBRANÇA DISPONÍVEIS NO MOMENTO.")
-                return False
-
-        # Generic search for a button in the active window
-        if self.active_voice_window and self.active_voice_window.winfo_exists():
-            found_button = self._find_button_by_text(self.active_voice_window, normalized_command)
-            if found_button:
-                found_button.invoke()
-                return True
-
-        print(f"Comando de voz '{command}' não corresponde a nenhum botão ou atalho na tela atual.")
-        return False
-
-    def _find_button_by_text(self, parent_widget, text_to_find):
-        """Recursively searches for a button with matching text in a widget."""
-        for widget in parent_widget.winfo_children():
-            if isinstance(widget, tk.Button):
-                btn_text = normalize_key(widget.cget("text"))
-                if text_to_find in btn_text:
-                    print(f"Botão encontrado: '{widget.cget('text')}'")
-                    return widget
-
-            # Recurse into container widgets
-            found = self._find_button_by_text(widget, text_to_find)
-            if found:
-                return found
-        return None
 
     def toggle_password_visibility(self, event=None):
         if self.password_visible:
@@ -1231,7 +1068,6 @@ class App:
             self.password_visible = True
 
     def on_close(self):
-        self.listening = False
         for txt_file in [
                 TXT_ULTIMO_ENVIO,
                 TXT_ENVIO,
@@ -2153,9 +1989,6 @@ class App:
         self.status_frame = tk.Frame(main_frame)
         self.status_frame.pack(pady=20, fill="x", expand=True)
 
-        # Start listening for the activation phrase in a separate thread
-        threading.Thread(target=self._listen_for_activation_phrase, daemon=True).start()
-
         # Footer Frame
         rodape = tk.Frame(main_frame)
         rodape.pack(side=tk.BOTTOM, fill=tk.X)
@@ -2175,7 +2008,6 @@ class App:
     def confirmar_saida(self):
         usuario_nome = self.usuario_atual.upper()
         if messagebox.askyesno("E.A.I. - CONFIRMAÇÃO DE SAÍDA", f"{usuario_nome}, TEM CERTEZA QUE DESEJA SAIR DO SISTEMA?"):
-            self.listening = False
             messagebox.showinfo(
                 "E.A.I. - AGRADECIMENTO", f"{usuario_nome}, OBRIGADO POR UTILIZAR O SISTEMA E.A.I. - E-SOCIAL ARTIFICIAL INTELLIGENCE.")
             self.tela_login()
