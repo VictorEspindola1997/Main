@@ -755,7 +755,7 @@ def enviar_email_label(label, df, usuario):
         time.sleep(0.25)
         assinatura_html = mail.HTMLBody or ""
         corpo_html = (
-            "<html><body>"
+            "<html><body style='font-family: Calibri; font-size: 11pt;'>"
             "<p>Bom dia,</p>"
             "<p>Segue listagem de funcionários que estão Ativos em nosso sistema. "
             "Por gentileza confirmar se a listagem está correta, conferindo Nome, Cargo e Situação (Ativo/Afastado/Pendente).</p>"
