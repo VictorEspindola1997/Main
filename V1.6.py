@@ -2150,7 +2150,7 @@ class App:
             lbl, registros_envio) and not self._has_ok_status(lbl)]
         botoes.sort(key=lambda x: normalize_key(x))
         self.contador_label_envio = tk.Label(
-            frame_top, text=f"{self.enviados}/{len(botoes)}", font=FONT_LABEL)
+            frame_top, text=f"RESTA ENVIAR A LISTAGEM PARA {len(botoes)} EMPRESAS", font=FONT_LABEL)
         self.contador_label_envio.pack(pady=2)
         container = tk.Frame(win)
         container.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -2229,10 +2229,9 @@ class App:
                 messagebox.showerror(
                     "ERRO", f"FALHA AO ENVIAR '{label}': {err}")
 
-            total_inicial = int(
-                self.contador_label_envio.cget("text").split('/')[1])
-            self.contador_label_envio.config(
-                text=f"{self.enviados}/{total_inicial}")
+            if self.frame_empresas_envio and self.frame_empresas_envio.winfo_exists():
+                remaining_buttons = len([w for w in self.frame_empresas_envio.winfo_children() if isinstance(w, tk.Button)])
+                self.contador_label_envio.config(text=f"RESTA ENVIAR A LISTAGEM PARA {remaining_buttons} EMPRESAS")
 
         self.root.after(0, ui_update)
 
@@ -2265,10 +2264,10 @@ class App:
                 else:
                     messagebox.showerror(
                         "ERRO", f"FALHA AO ENVIAR '{lbl}': {e}")
-                remaining = len([w2 for w2 in self.frame_empresas_envio.winfo_children(
-                ) if isinstance(w2, tk.Button)])
-                self.contador_label_envio.config(
-                    text=f"{self.enviados}/{remaining}")
+
+                if self.frame_empresas_envio and self.frame_empresas_envio.winfo_exists():
+                    remaining_buttons = len([w for w in self.frame_empresas_envio.winfo_children() if isinstance(w, tk.Button)])
+                    self.contador_label_envio.config(text=f"RESTA ENVIAR A LISTAGEM PARA {remaining_buttons} EMPRESAS")
             self.root.after(0, ui_update_after_one)
             time.sleep(0.4)
 
