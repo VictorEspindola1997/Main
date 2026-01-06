@@ -52,7 +52,6 @@ class App(tk.Tk):
         notebook.pack(expand=True, fill='both')
 
         self.days = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira"]
-        days_short = ["SEG", "TER", "QUA", "QUI", "SEX"]
         today = datetime.now()
         start_of_week = today - timedelta(days=today.weekday())
 
@@ -62,9 +61,8 @@ class App(tk.Tk):
 
         for i, day in enumerate(self.days):
             current_day_date = start_of_week + timedelta(days=i)
-            date_str_display = current_day_date.strftime("%d/%m")
             date_str_save = current_day_date.strftime("%Y-%m-%d")
-            tab_title = f"{date_str_display} - {days_short[i]}"
+            tab_title = day # Use the full day name for the tab title
 
             # Create a canvas and a scrollbar for each day
             canvas = tk.Canvas(notebook, highlightthickness=0)
