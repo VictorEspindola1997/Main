@@ -90,7 +90,10 @@ class App(tk.Tk):
             canvas.configure(yscrollcommand=scrollbar.set)
 
             # Mouse wheel scrolling - bind to the canvas of this tab
-            canvas.bind("<MouseWheel>", lambda event, c=canvas: c.yview_scroll(int(-1*(event.delta/120)), "units"))
+            def _on_mousewheel(event, c=canvas):
+                c.yview_scroll(int(-1*(event.delta/120)), "units")
+
+            canvas.bind("<MouseWheel>", _on_mousewheel)
 
             canvas.pack(side="left", fill="both", expand=True)
             scrollbar.pack(side="right", fill="y")
@@ -103,9 +106,10 @@ class App(tk.Tk):
             if day == "Sexta-feira":
                 self._create_friday_widgets(day)
             self._create_common_widgets(day)
-            self._create_diet_widgets(day)
+            self._create_diet_widgets(day, canvas, _on_mousewheel)
             is_training_day = day in ["Segunda-feira", "Quarta-feira", "Sexta-feira"]
-            self._create_training_and_flex_widgets(day, is_training_day)
+            is_tue_thu = day in ["Terça-feira", "Quinta-feira"]
+            self._create_training_and_flex_widgets(day, is_training_day, is_tue_thu)
 
         # Select previous working day
         today_index = datetime.now().weekday()
@@ -193,7 +197,7 @@ class App(tk.Tk):
         cha_label.pack(side='left', padx=5)
 
 
-    def _create_training_and_flex_widgets(self, day, is_training_day):
+    def _create_training_and_flex_widgets(self, day, is_training_day, is_tue_thu):
         frame = self.day_tabs[day]
         widgets = self.widgets[day]
 
@@ -203,7 +207,43 @@ class App(tk.Tk):
         if is_training_day:
             self._create_training_widgets(day)
 
+        if is_tue_thu:
+            self._create_tue_thu_training_widgets(day)
+
         self._create_flex_widgets(day)
+
+    def _create_tue_thu_training_widgets(self, day):
+        frame = self.day_tabs[day]
+        widgets = self.widgets[day]
+
+        ttk.Label(frame, text="Treinou hoje?").pack(anchor='w', pady=(10, 0))
+        treino_var = tk.StringVar()
+        widgets['tue_thu_treino_var'] = treino_var
+
+        sim_frame = ttk.Frame(frame)
+        nao_frame = ttk.Frame(frame)
+
+        def toggle_treino_details():
+            if treino_var.get() == "sim":
+                sim_frame.pack(pady=5, anchor='w', fill='x')
+                nao_frame.pack_forget()
+            elif treino_var.get() == "nao":
+                nao_frame.pack(pady=5, anchor='w', fill='x')
+                sim_frame.pack_forget()
+
+        ttk.Radiobutton(frame, text="Sim", variable=treino_var, value="sim", command=toggle_treino_details).pack(anchor='w')
+        ttk.Radiobutton(frame, text="Não", variable=treino_var, value="nao", command=toggle_treino_details).pack(anchor='w')
+
+        # --- Sim Frame ---
+        ttk.Label(sim_frame, text="Descreva como foi:").pack(anchor='w')
+        widgets['tue_thu_treino_desc'] = tk.Text(sim_frame, height=3, width=50)
+        widgets['tue_thu_treino_desc'].pack(pady=5, anchor='w')
+
+        # --- Não Frame ---
+        ttk.Label(nao_frame, text="Justifique-se...").pack(anchor='w')
+        widgets['tue_thu_treino_just'] = tk.Text(nao_frame, height=3, width=50)
+        widgets['tue_thu_treino_just'].pack(pady=5, anchor='w')
+
 
     def _create_flex_widgets(self, day):
         frame = self.day_tabs[day]
@@ -226,7 +266,6 @@ class App(tk.Tk):
 
         ttk.Radiobutton(frame, text="Opa, claro que fiz!!!", variable=flexoes_var, value="sim", command=toggle_justificativa).pack(anchor='w')
         ttk.Radiobutton(frame, text="Putz, hoje não deu...", variable=flexoes_var, value="nao", command=toggle_justificativa).pack(anchor='w')
-        flexoes_var.set("sim")
 
         ttk.Label(justificativa_frame, text="Justifique este absurdo:").pack(anchor='w')
         widgets['flexoes_justificativa'] = tk.Text(justificativa_frame, height=2, width=50)
@@ -247,10 +286,10 @@ class App(tk.Tk):
         cansaco_frame = ttk.Frame(frame)
         cansaco_frame.pack(anchor='w', pady=5, fill='x')
 
-        cansaco_var = tk.IntVar(value=0)
+        cansaco_var = tk.IntVar()
         widgets['treino_cansaco'] = cansaco_var
 
-        cansaco_label = ttk.Label(cansaco_frame, text="Selecionado: 0", width=15)
+        cansaco_label = ttk.Label(cansaco_frame, text="Selecionado: --", width=15)
 
         def update_cansaco_label():
             cansaco_label.config(text=f"Selecionado: {cansaco_var.get()}")
@@ -349,6 +388,18 @@ class App(tk.Tk):
                  is_valid = False
                  error_messages.append("- Progressão de Carga") # No visual feedback for radio buttons, msg is enough
 
+        # Tue/Thu Training
+        if day in ["Terça-feira", "Quinta-feira"]:
+            if not day_widgets['tue_thu_treino_var'].get():
+                is_valid = False
+                error_messages.append("- Treinou hoje?")
+            elif day_widgets['tue_thu_treino_var'].get() == 'sim' and not day_widgets['tue_thu_treino_desc'].get('1.0', tk.END).strip():
+                is_valid = False
+                error_messages.append("- Descrição do Treino")
+            elif day_widgets['tue_thu_treino_var'].get() == 'nao' and not day_widgets['tue_thu_treino_just'].get('1.0', tk.END).strip():
+                is_valid = False
+                error_messages.append("- Justificativa do Treino")
+
         # Flexões Justificativa (if applicable)
         if day_widgets['flexoes_var'].get() == 'nao' and not day_widgets['flexoes_justificativa'].get('1.0', tk.END).strip():
             is_valid = False
@@ -377,10 +428,17 @@ class App(tk.Tk):
             data['flexoes_justificativa'] = day_widgets['flexoes_justificativa'].get('1.0', tk.END).strip()
 
         # Training widgets
-        if selected_day_index in [0, 2, 4]:
+        if selected_day_index in [0, 2, 4]: # Mon, Wed, Fri
             data['treino_relato'] = day_widgets['treino_relato'].get('1.0', tk.END).strip()
             data['treino_cansaco'] = day_widgets['treino_cansaco'].get()
             data['treino_carga'] = day_widgets['treino_carga'].get()
+
+        if selected_day_index in [1, 3]: # Tue, Thu
+            data['tue_thu_treino'] = day_widgets['tue_thu_treino_var'].get()
+            if data['tue_thu_treino'] == 'sim':
+                data['tue_thu_treino_desc'] = day_widgets['tue_thu_treino_desc'].get('1.0', tk.END).strip()
+            else:
+                data['tue_thu_treino_just'] = day_widgets['tue_thu_treino_just'].get('1.0', tk.END).strip()
 
         # Friday widgets
         if selected_day_index == 4:
@@ -430,7 +488,7 @@ class App(tk.Tk):
         messagebox.showinfo("Sucesso", "Informações salvas com sucesso!")
 
 
-    def _create_diet_widgets(self, day):
+    def _create_diet_widgets(self, day, canvas, scroll_func):
         frame = self.day_tabs[day]
         widgets = self.widgets[day]
 
@@ -473,8 +531,8 @@ class App(tk.Tk):
             widgets['dieta'][meal] = {}
             for i, (label_text, option_list) in enumerate(options):
                 ttk.Label(meal_frame, text=label_text).grid(row=i, column=0, sticky='w', padx=5, pady=5)
-                combo = ttk.Combobox(meal_frame, values=option_list, state="readonly")
-                combo.bind("<MouseWheel>", lambda e: "break")
+                combo = ttk.Combobox(meal_frame, values=option_list, state="readonly", width=30)
+                combo.bind("<MouseWheel>", lambda event, c=canvas: scroll_func(event, c))
                 combo.grid(row=i, column=1, sticky='ew', padx=5, pady=5)
                 meal_frame.grid_columnconfigure(1, weight=1)
                 widgets['dieta'][meal][label_text.replace(":", "")] = combo
@@ -571,7 +629,10 @@ class App(tk.Tk):
             "treino_relato": "Relato do Treino",
             "treino_cansaco": "Nível de Cansaço (Treino)",
             "treino_carga": "Houve Progressão de Carga?",
-            "peso": "Peso em Jejum (kg)"
+            "peso": "Peso em Jejum (kg)",
+            "tue_thu_treino": "Treinou Hoje?",
+            "tue_thu_treino_desc": "Descrição do Treino",
+            "tue_thu_treino_just": "Justificativa (Treino)"
         }
 
         # General data first
