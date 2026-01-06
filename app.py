@@ -9,9 +9,22 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("FOCO TOTAL 2026")
-        self.geometry("800x600")
+        self.withdraw() # Hide main window until it's centered
+
+        # --- Style ---
+        self.style = ttk.Style(self)
+        self.style.configure("Bold.TButton", font=("Helvetica", 10, "bold"))
 
         self.create_main_menu()
+        self._center_window(self, 900, 700)
+        self.deiconify() # Show window after centering
+
+    def _center_window(self, window, width, height):
+        screen_width = window.winfo_screenwidth()
+        screen_height = window.winfo_screenheight()
+        x = (screen_width / 2) - (width / 2)
+        y = (screen_height / 2) - (height / 2)
+        window.geometry(f'{width}x{height}+{int(x)}+{int(y)}')
 
     def create_main_menu(self):
         for widget in self.winfo_children():
@@ -20,16 +33,19 @@ class App(tk.Tk):
         main_frame = ttk.Frame(self)
         main_frame.pack(expand=True)
 
-        enter_button = ttk.Button(main_frame, text="Entrar no sistema", command=self.open_daily_tracker)
+        enter_button = ttk.Button(main_frame, text="ENTRAR NO SISTEMA", style="Bold.TButton", command=self.open_daily_tracker)
         enter_button.pack(pady=20)
 
-        history_button = ttk.Button(main_frame, text="Histórico", command=self.open_history)
+        history_button = ttk.Button(main_frame, text="HISTÓRICO", style="Bold.TButton", command=self.open_history)
         history_button.pack(pady=20)
+
+        exit_button = ttk.Button(main_frame, text="SAIR", style="Bold.TButton", command=self.destroy)
+        exit_button.pack(pady=20)
 
     def open_daily_tracker(self):
         tracker_window = tk.Toplevel(self)
-        tracker_window.title("Acompanhamento Diário")
-        tracker_window.geometry("800x600")
+        tracker_window.title("FOCO TOTAL 2026")
+        self._center_window(tracker_window, 900, 700)
 
         notebook = ttk.Notebook(tracker_window)
         notebook.pack(expand=True, fill='both', padx=10, pady=10)
@@ -58,18 +74,29 @@ class App(tk.Tk):
         button_frame = ttk.Frame(tracker_window)
         button_frame.pack(pady=10)
 
-        style = ttk.Style()
-        style.configure("Bold.TButton", font=("Helvetica", 10, "bold"))
-
         save_button = ttk.Button(button_frame, text="SALVAR", style="Bold.TButton", command=lambda: self._save_data(notebook, days))
         save_button.pack(side='left', padx=10)
 
-        extras_button = ttk.Button(button_frame, text="Extras", command=self.open_extras)
+        extras_button = ttk.Button(button_frame, text="EXTRAS", style="Bold.TButton", command=self.open_extras)
         extras_button.pack(side='left', padx=10)
+
+        exit_button = ttk.Button(button_frame, text="SAIR", style="Bold.TButton", command=tracker_window.destroy)
+        exit_button.pack(side='left', padx=10)
 
 
     def open_extras(self):
         messagebox.showinfo("Extras", "Esta funcionalidade será implementada em breve!")
+
+
+    def _update_int_scale(self, value, label, variable, suffix=""):
+        rounded_value = round(float(value))
+        variable.set(rounded_value)
+        label.config(text=f"{rounded_value} {suffix}")
+
+    def _update_float_scale(self, value, label, variable, suffix=""):
+        rounded_value = round(float(value) * 2) / 2
+        variable.set(rounded_value)
+        label.config(text=f"{rounded_value:.1f} {suffix}")
 
 
     def _create_common_widgets(self, day):
@@ -83,25 +110,41 @@ class App(tk.Tk):
 
         # --- Escovou os dentes ---
         ttk.Label(frame, text="Quantas vezes escovou os dentes?").pack(pady=(10,0), anchor='w')
-        dentes_var = tk.IntVar()
+        dentes_frame = ttk.Frame(frame)
+        dentes_frame.pack(anchor='w', fill='x')
+        dentes_var = tk.IntVar(value=0)
         widgets['dentes_var'] = dentes_var
-        dentes_scale = ttk.Scale(frame, from_=0, to=4, orient='horizontal', length=200, variable=dentes_var, command=lambda v: dentes_var.set(round(float(v))))
-        dentes_scale.pack(pady=5, anchor='w')
+        dentes_label = ttk.Label(dentes_frame, text="0 ", width=4)
+        dentes_scale = ttk.Scale(dentes_frame, from_=0, to=4, orient='horizontal', variable=dentes_var,
+                                 command=lambda v, lbl=dentes_label, var=dentes_var: self._update_int_scale(v, lbl, var))
+        dentes_scale.pack(side='left', pady=5, fill='x', expand=True)
+        dentes_label.pack(side='left', padx=5)
 
 
         # --- Meta de água ---
         ttk.Label(frame, text="Meta diária de água: 4 litros").pack(pady=(10,0), anchor='w')
-        agua_var = tk.DoubleVar()
+        agua_frame = ttk.Frame(frame)
+        agua_frame.pack(anchor='w', fill='x')
+        agua_var = tk.DoubleVar(value=0.0)
         widgets['agua_var'] = agua_var
-        agua_scale = ttk.Scale(frame, from_=0, to=4, orient='horizontal', length=400, variable=agua_var, command=lambda v: agua_var.set(round(float(v) * 2) / 2))
-        agua_scale.pack(pady=5, anchor='w')
+        agua_label = ttk.Label(agua_frame, text="0.0 L", width=6)
+        agua_scale = ttk.Scale(agua_frame, from_=0, to=4, orient='horizontal', variable=agua_var,
+                               command=lambda v, lbl=agua_label, var=agua_var: self._update_float_scale(v, lbl, var, "L"))
+        agua_scale.pack(side='left', pady=5, fill='x', expand=True)
+        agua_label.pack(side='left', padx=5)
 
         # --- Meta de chá ---
         ttk.Label(frame, text="Meta diária de chá de hibisco: 1 litro").pack(pady=(10,0), anchor='w')
-        cha_var = tk.DoubleVar()
+        cha_frame = ttk.Frame(frame)
+        cha_frame.pack(anchor='w', fill='x')
+        cha_var = tk.DoubleVar(value=0.0)
         widgets['cha_var'] = cha_var
-        cha_scale = ttk.Scale(frame, from_=0, to=1, orient='horizontal', length=200, variable=cha_var, command=lambda v: cha_var.set(round(float(v) * 2) / 2))
-        cha_scale.pack(pady=5, anchor='w')
+        cha_label = ttk.Label(cha_frame, text="0.0 L", width=6)
+        cha_scale = ttk.Scale(cha_frame, from_=0, to=1, orient='horizontal', variable=cha_var,
+                              command=lambda v, lbl=cha_label, var=cha_var: self._update_float_scale(v, lbl, var, "L"))
+        cha_scale.pack(side='left', pady=5, fill='x', expand=True)
+        cha_label.pack(side='left', padx=5)
+
 
         # --- 100 flexões ---
         ttk.Label(frame, text="E as 100 flexões?").pack(pady=(10,0), anchor='w')
@@ -140,12 +183,23 @@ class App(tk.Tk):
 
         # --- Nível de cansaço ---
         ttk.Label(frame, text="De 0 a 10, qual foi o nível de cansaço no treino de musculação?").pack(anchor='w')
-        cansaco_var = tk.IntVar()
-        widgets['treino_cansaco'] = cansaco_var
         cansaco_frame = ttk.Frame(frame)
-        cansaco_frame.pack(anchor='w', pady=5)
+        cansaco_frame.pack(anchor='w', pady=5, fill='x')
+
+        cansaco_var = tk.IntVar(value=0)
+        widgets['treino_cansaco'] = cansaco_var
+
+        cansaco_label = ttk.Label(cansaco_frame, text="Selecionado: 0", width=15)
+
+        def update_cansaco_label():
+            cansaco_label.config(text=f"Selecionado: {cansaco_var.get()}")
+
+        radio_frame = ttk.Frame(cansaco_frame)
         for i in range(11):
-            ttk.Radiobutton(cansaco_frame, text=str(i), variable=cansaco_var, value=i).pack(side='left')
+            ttk.Radiobutton(radio_frame, text=str(i), variable=cansaco_var, value=i, command=update_cansaco_label).pack(side='left')
+
+        radio_frame.pack(side='left')
+        cansaco_label.pack(side='left', padx=10)
 
         # --- Progressão de carga ---
         ttk.Label(frame, text="Houve progressão de carga?").pack(anchor='w')
@@ -221,6 +275,13 @@ class App(tk.Tk):
         with open(file_path, 'w') as f:
             json.dump(all_data, f, indent=4)
 
+        # Hide the file on Windows
+        if os.name == 'nt':
+            try:
+                os.system(f'attrib +h "{file_path}"')
+            except Exception as e:
+                print(f"Não foi possível ocultar o arquivo: {e}")
+
         messagebox.showinfo("Sucesso", "Informações salvas com sucesso!")
 
 
@@ -238,24 +299,42 @@ class App(tk.Tk):
                 return
 
         history_window = tk.Toplevel(self)
-        history_window.title("Histórico de Registros")
-        history_window.geometry("600x400")
+        history_window.title("FOCO TOTAL 2026")
+        self._center_window(history_window, 900, 700)
 
-        # Basic implementation, will improve with scrollable frame later if needed
-        main_frame = ttk.Frame(history_window)
-        main_frame.pack(expand=True, fill='both', padx=10, pady=10)
+        # Frame for buttons and a potential scrollbar
+        canvas = tk.Canvas(history_window)
+        scrollbar = ttk.Scrollbar(history_window, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
         sorted_dates = sorted(all_data.keys(), reverse=True)
 
         for date_str in sorted_dates:
-            btn = ttk.Button(main_frame, text=date_str,
+            btn = ttk.Button(scrollable_frame, text=date_str, style="Bold.TButton",
                              command=lambda d=date_str, data=all_data[date_str]: self._show_history_details(d, data))
-            btn.pack(pady=5, fill='x')
+            btn.pack(pady=5, padx=10, fill='x')
+
+        exit_button = ttk.Button(history_window, text="SAIR", style="Bold.TButton", command=history_window.destroy)
+        exit_button.pack(pady=10)
+
 
     def _show_history_details(self, date_str, data):
         details_window = tk.Toplevel(self)
-        details_window.title(f"Detalhes de {date_str}")
-        details_window.geometry("500x550")
+        details_window.title("FOCO TOTAL 2026")
+        self._center_window(details_window, 900, 700)
 
         text_widget = tk.Text(details_window, wrap='word', font=("Helvetica", 10), spacing1=5, spacing2=5, spacing3=5)
         text_widget.pack(expand=True, fill='both', padx=10, pady=10)
@@ -288,6 +367,9 @@ class App(tk.Tk):
 
         text_widget.insert(tk.END, display_text)
         text_widget.config(state='disabled') # Make it read-only
+
+        exit_button = ttk.Button(details_window, text="SAIR", style="Bold.TButton", command=details_window.destroy)
+        exit_button.pack(pady=10)
 
 
 if __name__ == "__main__":
