@@ -3,7 +3,7 @@ from tkinter import ttk
 from tkinter import messagebox
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class App(tk.Tk):
     def __init__(self):
@@ -49,18 +49,49 @@ class App(tk.Tk):
         self._center_window(tracker_window, 900, 700)
 
         notebook = ttk.Notebook(tracker_window)
-        notebook.pack(expand=True, fill='both', padx=10, pady=10)
+        notebook.pack(expand=True, fill='both')
 
-        days = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira"]
+        self.days = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira"]
+        days_short = ["SEG", "TER", "QUA", "QUI", "SEX"]
+        today = datetime.now()
+        start_of_week = today - timedelta(days=today.weekday())
+
         self.day_tabs = {}
         self.widgets = {}
+        self.tab_dates = {} # Store date for each tab
 
-        for i, day in enumerate(days):
-            frame = ttk.Frame(notebook, padding="10")
-            notebook.add(frame, text=day)
-            self.day_tabs[day] = frame
+        for i, day in enumerate(self.days):
+            current_day_date = start_of_week + timedelta(days=i)
+            date_str_display = current_day_date.strftime("%d/%m")
+            date_str_save = current_day_date.strftime("%Y-%m-%d")
+            tab_title = f"{date_str_display} - {days_short[i]}"
+
+            # Create a canvas and a scrollbar for each day
+            canvas = tk.Canvas(notebook, highlightthickness=0)
+            scrollbar = ttk.Scrollbar(notebook, orient="vertical", command=canvas.yview)
+            scrollable_frame = ttk.Frame(canvas)
+
+            scrollable_frame.bind(
+                "<Configure>",
+                lambda e, c=canvas: c.configure(scrollregion=c.bbox("all"))
+            )
+
+            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            # Mouse wheel scrolling
+            canvas.bind("<MouseWheel>", lambda event, c=canvas: c.yview_scroll(int(-1*(event.delta/120)), "units"))
+
+            tab_id = notebook.add(canvas, text=tab_title)
+            self.tab_dates[tab_id] = date_str_save # Store the YYYY-MM-DD date
+
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+
+            self.day_tabs[day] = scrollable_frame
             self.widgets[day] = {}
             self._create_common_widgets(day)
+            self._create_diet_widgets(day) # Add diet section to all days
             if i in [0, 2, 4]: # Monday, Wednesday, Friday
                 self._create_training_widgets(day)
             if i == 4: # Friday
@@ -86,7 +117,7 @@ class App(tk.Tk):
         button_frame = ttk.Frame(tracker_window)
         button_frame.pack(pady=10)
 
-        save_button = ttk.Button(button_frame, text="SALVAR", style="Bold.TButton", command=lambda: self._save_data(notebook, days))
+        save_button = ttk.Button(button_frame, text="SALVAR", style="Bold.TButton", command=lambda nb=notebook: self._save_data(nb))
         save_button.pack(side='left', padx=10)
 
         extras_button = ttk.Button(button_frame, text="EXTRAS", style="Bold.TButton", command=self.open_extras)
@@ -200,7 +231,8 @@ class App(tk.Tk):
 
         radio_frame = ttk.Frame(cansaco_frame)
         for i in range(11):
-            ttk.Radiobutton(radio_frame, text=str(i), variable=cansaco_var, value=i, command=update_cansaco_label).pack(side='left')
+            rb = ttk.Radiobutton(radio_frame, text=str(i), variable=cansaco_var, value=i, command=update_cansaco_label)
+            rb.pack(side='left', padx=5) # Added padx for spacing
 
         radio_frame.pack(side='left')
         cansaco_label.pack(side='left', padx=10)
@@ -238,9 +270,9 @@ class App(tk.Tk):
             return True
         return P == ""
 
-    def _save_data(self, notebook, days):
+    def _save_data(self, notebook):
         selected_day_index = notebook.index(notebook.select())
-        day = days[selected_day_index]
+        day = self.days[selected_day_index] # Use the stored full day names
 
         data = {}
         day_widgets = self.widgets[day]
@@ -263,6 +295,14 @@ class App(tk.Tk):
         if selected_day_index == 4:
             data['peso'] = day_widgets['peso'].get()
 
+        # Diet widgets
+        data['dieta'] = {}
+        if 'dieta' in day_widgets:
+            for meal, options in day_widgets['dieta'].items():
+                data['dieta'][meal] = {}
+                for option, combo in options.items():
+                    data['dieta'][meal][option] = combo.get()
+
         # Save data
         file_path = '.foco_data.json'
         all_data = {}
@@ -273,8 +313,10 @@ class App(tk.Tk):
                 except json.JSONDecodeError:
                     pass # file is empty or corrupted
 
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        all_data[today_str] = data
+        selected_tab_id = notebook.select()
+        save_date_str = self.tab_dates[selected_tab_id]
+
+        all_data[save_date_str] = data
 
         with open(file_path, 'w') as f:
             json.dump(all_data, f, indent=4)
@@ -287,6 +329,54 @@ class App(tk.Tk):
                 print(f"Não foi possível ocultar o arquivo: {e}")
 
         messagebox.showinfo("Sucesso", "Informações salvas com sucesso!")
+
+
+    def _create_diet_widgets(self, day):
+        frame = self.day_tabs[day]
+        widgets = self.widgets[day]
+
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=15)
+
+        diet_title_font = ("Helvetica", 12, "bold")
+        ttk.Label(frame, text="DIETA:", font=diet_title_font).pack(anchor='w', pady=(10, 5))
+
+        diet_options = {
+            "Café da manhã": [
+                ("Pão:", ["2 fatias de pão de forma", "1 pão francês"]),
+                ("Proteína:", ["1 ovo", "2 fatias de muçarela"]),
+                ("Fruta:", ["100g de uva", "100g de mamão", "100g de abacaxi", "150g de melancia", "150g de melão", "150g de morango", "100g de jabuticaba"])
+            ],
+            "Almoço": [
+                ("Carboidrato:", ["50g de arroz", "50g de mandioca", "120g de batata"]),
+                ("Proteína:", ["200g de peito de frango", "150g de patinho", "180g de atum"]),
+                ("Leguminosa:", ["100g de feijão"]),
+                ("Salada:", ["100g de vegetais e folhas"]),
+                ("Sobremesa:", ["20g de paçoca"])
+            ],
+            "Lanche da tarde": [
+                ("Base:", ["200g de iogurte natural desnatado", "220ml de leite desnatado"]),
+                ("Fibra:", ["10g de psyllium"]),
+                ("Complemento:", ["100g de morango", "70g de uva", "50g de whey"])
+            ],
+            "Jantar": [
+                ("Carboidrato:", ["50g de arroz", "50g de macarrão", "120g de batata"]),
+                ("Proteína:", ["200g de patinho", "200g de atum"]),
+                ("Salada:", ["100g de vegetais e folhas"])
+            ]
+        }
+
+        widgets['dieta'] = {}
+        for meal, options in diet_options.items():
+            meal_frame = ttk.LabelFrame(frame, text=meal, padding=10)
+            meal_frame.pack(fill='x', expand=True, padx=5, pady=5)
+
+            widgets['dieta'][meal] = {}
+            for i, (label_text, option_list) in enumerate(options):
+                ttk.Label(meal_frame, text=label_text).grid(row=i, column=0, sticky='w', padx=5, pady=5)
+                combo = ttk.Combobox(meal_frame, values=option_list, state="readonly")
+                combo.grid(row=i, column=1, sticky='ew', padx=5, pady=5)
+                meal_frame.grid_columnconfigure(1, weight=1)
+                widgets['dieta'][meal][label_text.replace(":", "")] = combo
 
 
     def open_history(self):
@@ -340,8 +430,23 @@ class App(tk.Tk):
         details_window.title("FOCO TOTAL 2026")
         self._center_window(details_window, 900, 700)
 
-        text_widget = tk.Text(details_window, wrap='word', font=("Helvetica", 10), spacing1=5, spacing2=5, spacing3=5)
-        text_widget.pack(expand=True, fill='both', padx=10, pady=10)
+        # Create a canvas and a scrollbar
+        canvas = tk.Canvas(details_window, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(details_window, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.bind("<MouseWheel>", lambda event, c=canvas: c.yview_scroll(int(-1*(event.delta/120)), "units"))
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
         display_text = ""
         # Using a dictionary to map keys to user-friendly labels
@@ -358,19 +463,26 @@ class App(tk.Tk):
             "peso": "Peso em Jejum (kg)"
         }
 
+        # General data first
         for key, value in data.items():
-            label = labels.get(key, key.replace("_", " ").title()) # Get friendly label or format the key
+            if key == 'dieta': continue # Skip diet for now
 
-            # Format some values for better readability
-            if key == 'flexoes' or key == 'treino_carga':
+            label_text = labels.get(key, key.replace("_", " ").title())
+
+            if key in ['flexoes', 'treino_carga']:
                 value = "Sim" if value == 'sim' else "Não"
 
-            display_text += f"{label}:\n"
-            # Indent the value for clarity
-            display_text += f"  {value}\n\n"
+            ttk.Label(scrollable_frame, text=f"{label_text}:", font=("Helvetica", 10, "bold")).pack(anchor='w', pady=(10, 0))
+            ttk.Label(scrollable_frame, text=f"  {value}").pack(anchor='w')
 
-        text_widget.insert(tk.END, display_text)
-        text_widget.config(state='disabled') # Make it read-only
+        # Diet data
+        if 'dieta' in data and data['dieta']:
+            ttk.Label(scrollable_frame, text="DIETA:", font=("Helvetica", 11, "bold")).pack(anchor='w', pady=(10, 5))
+            for meal, options in data['dieta'].items():
+                ttk.Label(scrollable_frame, text=f"{meal}:").pack(anchor='w', pady=(5, 0))
+                for item, choice in options.items():
+                    if choice:
+                        ttk.Label(scrollable_frame, text=f"  - {item}: {choice}").pack(anchor='w')
 
         exit_button = ttk.Button(details_window, text="SAIR", style="Bold.TButton", command=details_window.destroy)
         exit_button.pack(pady=10)
