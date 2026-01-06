@@ -52,6 +52,7 @@ class App(tk.Tk):
         notebook.pack(expand=True, fill='both')
 
         self.days = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira"]
+        days_short = ["SEG", "TER", "QUA", "QUI", "SEX"]
         today = datetime.now()
         start_of_week = today - timedelta(days=today.weekday())
 
@@ -62,11 +63,19 @@ class App(tk.Tk):
         for i, day in enumerate(self.days):
             current_day_date = start_of_week + timedelta(days=i)
             date_str_save = current_day_date.strftime("%Y-%m-%d")
-            tab_title = day # Use the full day name for the tab title
+            date_str_display = current_day_date.strftime("%d/%m")
+            tab_title = f"{date_str_display} - {days_short[i]}"
 
-            # Create a canvas and a scrollbar for each day
-            canvas = tk.Canvas(notebook, highlightthickness=0)
-            scrollbar = ttk.Scrollbar(notebook, orient="vertical", command=canvas.yview)
+            # Create a container frame for each tab
+            tab_frame = ttk.Frame(notebook)
+            notebook.add(tab_frame, text=tab_title)
+
+            # Store the date against the tab's ID (which is the frame itself)
+            self.tab_dates[str(tab_frame)] = date_str_save
+
+            # Create a canvas and a scrollbar inside the container frame
+            canvas = tk.Canvas(tab_frame, highlightthickness=0)
+            scrollbar = ttk.Scrollbar(tab_frame, orient="vertical", command=canvas.yview)
             scrollable_frame = ttk.Frame(canvas)
 
             scrollable_frame.bind(
@@ -77,11 +86,8 @@ class App(tk.Tk):
             canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
             canvas.configure(yscrollcommand=scrollbar.set)
 
-            # Mouse wheel scrolling
+            # Mouse wheel scrolling - bind to the canvas of this tab
             canvas.bind("<MouseWheel>", lambda event, c=canvas: c.yview_scroll(int(-1*(event.delta/120)), "units"))
-
-            tab_id = notebook.add(canvas, text=tab_title)
-            self.tab_dates[tab_id] = date_str_save # Store the YYYY-MM-DD date
 
             canvas.pack(side="left", fill="both", expand=True)
             scrollbar.pack(side="right", fill="y")
@@ -311,7 +317,7 @@ class App(tk.Tk):
                 except json.JSONDecodeError:
                     pass # file is empty or corrupted
 
-        selected_tab_id = notebook.select()
+        selected_tab_id = str(notebook.nametowidget(notebook.select()))
         save_date_str = self.tab_dates[selected_tab_id]
 
         all_data[save_date_str] = data
