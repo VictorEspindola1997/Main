@@ -90,11 +90,6 @@ class App(tk.Tk):
             canvas.configure(yscrollcommand=scrollbar.set)
 
             # Mouse wheel scrolling - bind to the canvas of this tab
-            def _on_mousewheel(event, c=canvas):
-                c.yview_scroll(int(-1*(event.delta/120)), "units")
-
-            canvas.bind("<MouseWheel>", _on_mousewheel)
-
             canvas.pack(side="left", fill="both", expand=True)
             scrollbar.pack(side="right", fill="y")
 
@@ -106,7 +101,7 @@ class App(tk.Tk):
             if day == "Sexta-feira":
                 self._create_friday_widgets(day)
             self._create_common_widgets(day)
-            self._create_diet_widgets(day, canvas, _on_mousewheel)
+            self._create_diet_widgets(day)
             is_training_day = day in ["Segunda-feira", "Quarta-feira", "Sexta-feira"]
             is_tue_thu = day in ["Terça-feira", "Quinta-feira"]
             self._create_training_and_flex_widgets(day, is_training_day, is_tue_thu)
@@ -127,6 +122,30 @@ class App(tk.Tk):
         if 0 <= previous_day_index < 5:
             notebook.select(previous_day_index)
 
+        # Universal scroll for all widgets inside the notebook
+        def _universal_scroll(event):
+            try:
+                # Check if notebook still exists to prevent errors on window close
+                if not notebook.winfo_exists():
+                    return
+                active_tab_widget = notebook.nametowidget(notebook.select())
+                if active_tab_widget.winfo_children():
+                    canvas = active_tab_widget.winfo_children()[0]
+                    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            except (tk.TclError, AttributeError):
+                # This can happen if the widget is in the process of being destroyed
+                pass
+
+        # Bind globally, but we will manage it with on_close
+        self.bind_all("<MouseWheel>", _universal_scroll)
+
+        def on_close():
+            # Unbind the global scroll event before destroying the window
+            self.unbind_all("<MouseWheel>")
+            tracker_window.destroy()
+
+        tracker_window.protocol("WM_DELETE_WINDOW", on_close)
+
         # --- Action Buttons ---
         button_frame = ttk.Frame(tracker_window)
         button_frame.pack(pady=10)
@@ -137,7 +156,7 @@ class App(tk.Tk):
         extras_button = ttk.Button(button_frame, text="EXTRAS", style="Bold.TButton", command=self.open_extras)
         extras_button.pack(side='left', padx=10)
 
-        exit_button = ttk.Button(button_frame, text="SAIR", style="Bold.TButton", command=tracker_window.destroy)
+        exit_button = ttk.Button(button_frame, text="SAIR", style="Bold.TButton", command=on_close)
         exit_button.pack(side='left', padx=10)
 
 
@@ -161,12 +180,17 @@ class App(tk.Tk):
         widgets = self.widgets[day]
 
         title_font = ("Helvetica", 12, "bold")
-        ttk.Label(frame, text="SONO", font=title_font).pack(anchor='w', pady=(10, 5))
+        title_label = ttk.Label(frame, text="SONO", font=title_font)
+        title_label.pack(anchor='w', pady=(10, 5))
 
-        ttk.Label(frame, text="Qualidade do sono:").pack(pady=(10,0), anchor='w')
+        question_label = ttk.Label(frame, text="Qualidade do sono:")
+        question_label.pack(pady=(10,0), anchor='w')
+
         widgets['sono'] = tk.Text(frame, height=3, width=50)
         widgets['sono'].pack(pady=5, anchor='w')
-        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
+
+        separator = ttk.Separator(frame, orient='horizontal')
+        separator.pack(fill='x', pady=10)
 
 
     def _create_common_widgets(self, day):
@@ -286,7 +310,7 @@ class App(tk.Tk):
         cansaco_frame = ttk.Frame(frame)
         cansaco_frame.pack(anchor='w', pady=5, fill='x')
 
-        cansaco_var = tk.IntVar()
+        cansaco_var = tk.IntVar(value=-1)
         widgets['treino_cansaco'] = cansaco_var
 
         cansaco_label = ttk.Label(cansaco_frame, text="Selecionado: --", width=15)
@@ -371,12 +395,26 @@ class App(tk.Tk):
             error_messages.append("- Meta de Chá")
 
         # Dieta
-        for meal, options in day_widgets['dieta'].items():
-            for option, combo in options.items():
-                if not combo.get():
+        for meal, meal_data in day_widgets['dieta'].items():
+            if meal_data['pulei_var'].get():
+                if not meal_data['justificativa_pulei_widget'].get('1.0', tk.END).strip():
                     is_valid = False
-                    error_messages.append(f"- {meal}: {option}")
-                    combo.config(style="Error.TCombobox")
+                    error_messages.append(f"- {meal}: Justificativa (Pulei)")
+            else:
+                for item_name, item_widgets in meal_data['items'].items():
+                    selection = item_widgets['combo'].get()
+                    if not selection:
+                        is_valid = False
+                        error_messages.append(f"- {meal}: {item_name}")
+                        item_widgets['combo'].config(style="Error.TCombobox")
+                    elif selection == "Outra":
+                        if not item_widgets['outra_widget'].get('1.0', tk.END).strip():
+                            is_valid = False
+                            error_messages.append(f"- {meal}: {item_name} (Descreva)")
+                    elif selection == "Nenhum":
+                        if not item_widgets['nenhum_widget'].get('1.0', tk.END).strip():
+                            is_valid = False
+                            error_messages.append(f"- {meal}: {item_name} (Justifique-se)")
 
         # Treino (if applicable)
         if day in ["Segunda-feira", "Quarta-feira", "Sexta-feira"]:
@@ -414,7 +452,9 @@ class App(tk.Tk):
                 day_widgets['peso'].config(style="Error.TEntry")
 
         if not is_valid:
-            messagebox.showerror("Campos Obrigatórios", "Faltam informações a serem preenchidas:\n\n" + "\n".join(error_messages))
+            # Pass the tracker_window as parent to keep it in front
+            tracker_window = notebook.winfo_toplevel()
+            messagebox.showerror("Campos Obrigatórios", "Faltam informações a serem preenchidas:\n\n" + "\n".join(error_messages), parent=tracker_window)
             return
 
         # --- Data Collection ---
@@ -428,12 +468,12 @@ class App(tk.Tk):
             data['flexoes_justificativa'] = day_widgets['flexoes_justificativa'].get('1.0', tk.END).strip()
 
         # Training widgets
-        if selected_day_index in [0, 2, 4]: # Mon, Wed, Fri
+        if day in ["Segunda-feira", "Quarta-feira", "Sexta-feira"]:
             data['treino_relato'] = day_widgets['treino_relato'].get('1.0', tk.END).strip()
             data['treino_cansaco'] = day_widgets['treino_cansaco'].get()
             data['treino_carga'] = day_widgets['treino_carga'].get()
 
-        if selected_day_index in [1, 3]: # Tue, Thu
+        if day in ["Terça-feira", "Quinta-feira"]:
             data['tue_thu_treino'] = day_widgets['tue_thu_treino_var'].get()
             if data['tue_thu_treino'] == 'sim':
                 data['tue_thu_treino_desc'] = day_widgets['tue_thu_treino_desc'].get('1.0', tk.END).strip()
@@ -441,27 +481,35 @@ class App(tk.Tk):
                 data['tue_thu_treino_just'] = day_widgets['tue_thu_treino_just'].get('1.0', tk.END).strip()
 
         # Friday widgets
-        if selected_day_index == 4:
+        if day == "Sexta-feira":
             data['peso'] = day_widgets['peso'].get()
 
         # Diet widgets
         data['dieta'] = {}
         if 'dieta' in day_widgets:
-            for meal, options in day_widgets['dieta'].items():
-                data['dieta'][meal] = {}
-                for option, combo in options.items():
-                    data['dieta'][meal][option] = combo.get()
-
+            for meal, meal_data in day_widgets['dieta'].items():
+                data['dieta'][meal] = {'pulei': meal_data['pulei_var'].get()}
+                if meal_data['pulei_var'].get():
+                    data['dieta'][meal]['justificativa_pulei'] = meal_data['justificativa_pulei_widget'].get('1.0', tk.END).strip()
+                else:
+                    data['dieta'][meal]['items'] = {}
+                    for item_name, item_widgets in meal_data['items'].items():
+                        selection = item_widgets['combo'].get()
+                        data['dieta'][meal]['items'][item_name] = {'selection': selection}
+                        if selection == "Outra":
+                            data['dieta'][meal]['items'][item_name]['outra'] = item_widgets['outra_widget'].get('1.0', tk.END).strip()
+                        elif selection == "Nenhum":
+                            data['dieta'][meal]['items'][item_name]['nenhum'] = item_widgets['nenhum_widget'].get('1.0', tk.END).strip()
         # Save data
         file_path = '.foco_data.json'
         all_data = {}
 
-        # Un-hide the file on Windows before writing
+        # On Windows, un-hide the file before writing
         if os.name == 'nt' and os.path.exists(file_path):
             try:
                 os.system(f'attrib -h "{file_path}"')
             except Exception as e:
-                print(f"Não foi possível desocultar o arquivo para escrita: {e}")
+                print(f"Error removing hidden attribute: {e}")
 
         if os.path.exists(file_path):
             with open(file_path, 'r') as f:
@@ -488,7 +536,7 @@ class App(tk.Tk):
         messagebox.showinfo("Sucesso", "Informações salvas com sucesso!")
 
 
-    def _create_diet_widgets(self, day, canvas, scroll_func):
+    def _create_diet_widgets(self, day):
         frame = self.day_tabs[day]
         widgets = self.widgets[day]
 
@@ -496,6 +544,12 @@ class App(tk.Tk):
 
         diet_title_font = ("Helvetica", 12, "bold")
         ttk.Label(frame, text="DIETA:", font=diet_title_font).pack(anchor='w', pady=(10, 5))
+
+        diet_options = {
+            # ... (diet options will be defined inside)
+        }
+
+        widgets['dieta'] = {}
 
         diet_options = {
             "Café da manhã": [
@@ -523,19 +577,81 @@ class App(tk.Tk):
             ]
         }
 
-        widgets['dieta'] = {}
         for meal, options in diet_options.items():
-            meal_frame = ttk.LabelFrame(frame, text=meal, padding=10)
-            meal_frame.pack(fill='x', expand=True, padx=5, pady=5)
+            meal_container = ttk.Frame(frame)
+            meal_container.pack(fill='x', expand=True, padx=5, pady=5)
 
-            widgets['dieta'][meal] = {}
+            meal_frame = ttk.LabelFrame(meal_container, text=meal, padding=10)
+
+            pulei_var = tk.BooleanVar()
+            pulei_check = ttk.Checkbutton(meal_container, text="Pulei esta refeição.", variable=pulei_var)
+            pulei_check.pack(anchor='w', pady=5)
+
+            justificativa_pulei_frame = ttk.Frame(meal_container)
+            ttk.Label(justificativa_pulei_frame, text="Justifique-se:").pack(anchor='w')
+            justificativa_pulei_text = tk.Text(justificativa_pulei_frame, height=2, width=40)
+            justificativa_pulei_text.pack(pady=5, anchor='w', fill='x')
+
+            widgets['dieta'][meal] = {
+                'frame': meal_frame,
+                'pulei_var': pulei_var,
+                'justificativa_pulei_widget': justificativa_pulei_text,
+                'items': {}
+            }
+
+            def toggle_meal_frame(p_var, m_frame, j_frame):
+                if p_var.get():
+                    m_frame.pack_forget()
+                    j_frame.pack(fill='x', expand=True)
+                else:
+                    m_frame.pack(fill='x', expand=True)
+                    j_frame.pack_forget()
+
+            pulei_check.config(command=lambda p=pulei_var, m=meal_frame, j=justificativa_pulei_frame: toggle_meal_frame(p, m, j))
+
+            meal_frame.pack(fill='x', expand=True) # Initially visible
+
             for i, (label_text, option_list) in enumerate(options):
-                ttk.Label(meal_frame, text=label_text).grid(row=i, column=0, sticky='w', padx=5, pady=5)
-                combo = ttk.Combobox(meal_frame, values=option_list, state="readonly", width=30)
-                combo.bind("<MouseWheel>", lambda event, c=canvas: scroll_func(event, c))
-                combo.grid(row=i, column=1, sticky='ew', padx=5, pady=5)
+                option_list_ext = option_list + ["Nenhum", "Outra"]
+
+                item_frame = ttk.Frame(meal_frame)
+                item_frame.grid(row=i, column=0, columnspan=2, sticky='ew', pady=5)
                 meal_frame.grid_columnconfigure(1, weight=1)
-                widgets['dieta'][meal][label_text.replace(":", "")] = combo
+
+                ttk.Label(item_frame, text=label_text).pack(anchor='w')
+                combo = ttk.Combobox(item_frame, values=option_list_ext, state="readonly", width=30)
+                combo.pack(fill='x', expand=True)
+
+                # Conditional text boxes
+                outra_frame = ttk.Frame(item_frame)
+                ttk.Label(outra_frame, text="Descreva:").pack(anchor='w')
+                outra_text = tk.Text(outra_frame, height=2, width=40)
+                outra_text.pack(pady=5, anchor='w', fill='x')
+
+                nenhum_frame = ttk.Frame(item_frame)
+                ttk.Label(nenhum_frame, text="Justifique-se:").pack(anchor='w')
+                nenhum_text = tk.Text(nenhum_frame, height=2, width=40)
+                nenhum_text.pack(pady=5, anchor='w', fill='x')
+
+                widgets['dieta'][meal]['items'][label_text.replace(":", "")] = {
+                    'combo': combo,
+                    'outra_widget': outra_text,
+                    'nenhum_widget': nenhum_text
+                }
+
+                def on_combo_select(event, c=combo, o_frame=outra_frame, n_frame=nenhum_frame):
+                    selection = c.get()
+                    if selection == "Outra":
+                        o_frame.pack(fill='x', expand=True, pady=5)
+                    else:
+                        o_frame.pack_forget()
+
+                    if selection == "Nenhum":
+                        n_frame.pack(fill='x', expand=True, pady=5)
+                    else:
+                        n_frame.pack_forget()
+
+                combo.bind("<<ComboboxSelected>>", on_combo_select)
 
 
     def open_history(self):
@@ -612,7 +728,16 @@ class App(tk.Tk):
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
-        canvas.bind("<MouseWheel>", lambda event, c=canvas: c.yview_scroll(int(-1*(event.delta/120)), "units"))
+        def _details_scroll(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        details_window.bind_all("<MouseWheel>", _details_scroll)
+
+        def _on_details_close():
+            details_window.unbind_all("<MouseWheel>")
+            details_window.destroy()
+
+        details_window.protocol("WM_DELETE_WINDOW", _on_details_close)
 
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -650,13 +775,26 @@ class App(tk.Tk):
         # Diet data
         if 'dieta' in data and data['dieta']:
             ttk.Label(scrollable_frame, text="DIETA:", font=("Helvetica", 11, "bold")).pack(anchor='w', pady=(10, 5))
-            for meal, options in data['dieta'].items():
-                ttk.Label(scrollable_frame, text=f"{meal}:").pack(anchor='w', pady=(5, 0))
-                for item, choice in options.items():
-                    if choice:
-                        ttk.Label(scrollable_frame, text=f"  - {item}: {choice}").pack(anchor='w')
+            for meal, meal_data in data['dieta'].items():
+                if meal_data.get('pulei'):
+                    ttk.Label(scrollable_frame, text=f"{meal}: Pulei").pack(anchor='w', pady=(5, 0))
+                    justificativa = meal_data.get('justificativa_pulei', 'N/A')
+                    ttk.Label(scrollable_frame, text=f"  - Justificativa: {justificativa}").pack(anchor='w')
+                elif 'items' in meal_data:
+                    ttk.Label(scrollable_frame, text=f"{meal}:").pack(anchor='w', pady=(5, 0))
+                    for item_name, item_data in meal_data['items'].items():
+                        selection = item_data.get('selection')
+                        if selection:
+                            if selection == "Outra":
+                                desc = item_data.get('outra', 'N/A')
+                                ttk.Label(scrollable_frame, text=f"  - {item_name}: Outra ({desc})").pack(anchor='w')
+                            elif selection == "Nenhum":
+                                just = item_data.get('nenhum', 'N/A')
+                                ttk.Label(scrollable_frame, text=f"  - {item_name}: Nenhum ({just})").pack(anchor='w')
+                            else:
+                                ttk.Label(scrollable_frame, text=f"  - {item_name}: {selection}").pack(anchor='w')
 
-        exit_button = ttk.Button(details_window, text="SAIR", style="Bold.TButton", command=details_window.destroy)
+        exit_button = ttk.Button(details_window, text="SAIR", style="Bold.TButton", command=_on_details_close)
         exit_button.pack(pady=10)
 
 
