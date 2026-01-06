@@ -25,22 +25,23 @@ class App(tk.Tk):
         x = (screen_width / 2) - (width / 2)
         y = (screen_height / 2) - (height / 2)
         window.geometry(f'{width}x{height}+{int(x)}+{int(y)}')
+        window.resizable(False, False)
 
     def create_main_menu(self):
         for widget in self.winfo_children():
             widget.destroy()
 
         main_frame = ttk.Frame(self)
-        main_frame.pack(expand=True)
+        main_frame.pack(expand=True, padx=200, fill='x')
 
         enter_button = ttk.Button(main_frame, text="ENTRAR NO SISTEMA", style="Bold.TButton", command=self.open_daily_tracker)
-        enter_button.pack(pady=20)
+        enter_button.pack(pady=20, fill='x')
 
         history_button = ttk.Button(main_frame, text="HISTÓRICO", style="Bold.TButton", command=self.open_history)
-        history_button.pack(pady=20)
+        history_button.pack(pady=20, fill='x')
 
         exit_button = ttk.Button(main_frame, text="SAIR", style="Bold.TButton", command=self.destroy)
-        exit_button.pack(pady=20)
+        exit_button.pack(pady=20, fill='x')
 
     def open_daily_tracker(self):
         tracker_window = tk.Toplevel(self)
@@ -65,10 +66,21 @@ class App(tk.Tk):
             if i == 4: # Friday
                 self._create_friday_widgets(day)
 
-        # Select current day
-        current_day_index = datetime.now().weekday()
-        if 0 <= current_day_index < 5:
-            notebook.select(current_day_index)
+        # Select previous working day
+        today_index = datetime.now().weekday()
+        # Monday (0) -> Friday (4)
+        # Tuesday (1) -> Monday (0)
+        # ...
+        # Friday (4) -> Thursday (3)
+        # Saturday (5) -> Friday (4)
+        # Sunday (6) -> Friday (4)
+        if today_index == 0 or today_index > 4: # If Monday or weekend
+            previous_day_index = 4 # Friday
+        else:
+            previous_day_index = today_index - 1
+
+        if 0 <= previous_day_index < 5:
+            notebook.select(previous_day_index)
 
         # --- Action Buttons ---
         button_frame = ttk.Frame(tracker_window)
@@ -107,18 +119,7 @@ class App(tk.Tk):
         ttk.Label(frame, text="Qualidade do sono:").pack(pady=(10,0), anchor='w')
         widgets['sono'] = tk.Text(frame, height=3, width=50)
         widgets['sono'].pack(pady=5, anchor='w')
-
-        # --- Escovou os dentes ---
-        ttk.Label(frame, text="Quantas vezes escovou os dentes?").pack(pady=(10,0), anchor='w')
-        dentes_frame = ttk.Frame(frame)
-        dentes_frame.pack(anchor='w', fill='x')
-        dentes_var = tk.IntVar(value=0)
-        widgets['dentes_var'] = dentes_var
-        dentes_label = ttk.Label(dentes_frame, text="0 ", width=4)
-        dentes_scale = ttk.Scale(dentes_frame, from_=0, to=4, orient='horizontal', variable=dentes_var,
-                                 command=lambda v, lbl=dentes_label, var=dentes_var: self._update_int_scale(v, lbl, var))
-        dentes_scale.pack(side='left', pady=5, fill='x', expand=True)
-        dentes_label.pack(side='left', padx=5)
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
 
         # --- Meta de água ---
@@ -132,6 +133,7 @@ class App(tk.Tk):
                                command=lambda v, lbl=agua_label, var=agua_var: self._update_float_scale(v, lbl, var, "L"))
         agua_scale.pack(side='left', pady=5, fill='x', expand=True)
         agua_label.pack(side='left', padx=5)
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
         # --- Meta de chá ---
         ttk.Label(frame, text="Meta diária de chá de hibisco: 1 litro").pack(pady=(10,0), anchor='w')
@@ -144,6 +146,7 @@ class App(tk.Tk):
                               command=lambda v, lbl=cha_label, var=cha_var: self._update_float_scale(v, lbl, var, "L"))
         cha_scale.pack(side='left', pady=5, fill='x', expand=True)
         cha_label.pack(side='left', padx=5)
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
 
         # --- 100 flexões ---
@@ -177,9 +180,10 @@ class App(tk.Tk):
         ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=20)
 
         # --- Relato do treino ---
-        ttk.Label(frame, text="Relate como foi o seu treino:").pack(anchor='w')
+        ttk.Label(frame, text="Relate como foi o seu treino com o personal:").pack(anchor='w')
         widgets['treino_relato'] = tk.Text(frame, height=4, width=50)
         widgets['treino_relato'].pack(pady=5, anchor='w')
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
         # --- Nível de cansaço ---
         ttk.Label(frame, text="De 0 a 10, qual foi o nível de cansaço no treino de musculação?").pack(anchor='w')
@@ -200,13 +204,14 @@ class App(tk.Tk):
 
         radio_frame.pack(side='left')
         cansaco_label.pack(side='left', padx=10)
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
         # --- Progressão de carga ---
         ttk.Label(frame, text="Houve progressão de carga?").pack(anchor='w')
         carga_var = tk.StringVar()
         widgets['treino_carga'] = carga_var
-        ttk.Radiobutton(frame, text="SIM", variable=carga_var, value="sim").pack(anchor='w')
-        ttk.Radiobutton(frame, text="NÃO", variable=carga_var, value="nao").pack(anchor='w')
+        ttk.Radiobutton(frame, text="Sim", variable=carga_var, value="sim").pack(anchor='w')
+        ttk.Radiobutton(frame, text="Não", variable=carga_var, value="nao").pack(anchor='w')
 
 
     def _create_friday_widgets(self, day):
@@ -242,7 +247,6 @@ class App(tk.Tk):
 
         # Common widgets
         data['sono'] = day_widgets['sono'].get('1.0', tk.END).strip()
-        data['dentes'] = day_widgets['dentes_var'].get()
         data['agua'] = day_widgets['agua_var'].get()
         data['cha'] = day_widgets['cha_var'].get()
         data['flexoes'] = day_widgets['flexoes_var'].get()
