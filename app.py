@@ -76,7 +76,7 @@ class App(tk.Tk):
             # Create a canvas and a scrollbar inside the container frame
             canvas = tk.Canvas(tab_frame, highlightthickness=0)
             scrollbar = ttk.Scrollbar(tab_frame, orient="vertical", command=canvas.yview)
-            scrollable_frame = ttk.Frame(canvas)
+            scrollable_frame = ttk.Frame(canvas, padding=(20, 10))
 
             scrollable_frame.bind(
                 "<Configure>",
@@ -94,12 +94,15 @@ class App(tk.Tk):
 
             self.day_tabs[day] = scrollable_frame
             self.widgets[day] = {}
-            self._create_common_widgets(day)
-            self._create_diet_widgets(day) # Add diet section to all days
-            if i in [0, 2, 4]: # Monday, Wednesday, Friday
-                self._create_training_widgets(day)
-            if i == 4: # Friday
+
+            # Call all widget creation functions in the correct order
+            self._create_sleep_widgets(day)
+            if day == "Sexta-feira":
                 self._create_friday_widgets(day)
+            self._create_common_widgets(day)
+            self._create_diet_widgets(day)
+            is_training_day = day in ["Segunda-feira", "Quarta-feira", "Sexta-feira"]
+            self._create_training_and_flex_widgets(day, is_training_day)
 
         # Select previous working day
         today_index = datetime.now().weekday()
@@ -146,18 +149,22 @@ class App(tk.Tk):
         label.config(text=f"{rounded_value:.1f} {suffix}")
 
 
-    def _create_common_widgets(self, day):
+    def _create_sleep_widgets(self, day):
         frame = self.day_tabs[day]
         widgets = self.widgets[day]
 
-        # --- Qualidade do sono ---
+        title_font = ("Helvetica", 12, "bold")
+        ttk.Label(frame, text="SONO", font=title_font).pack(anchor='w', pady=(10, 5))
+
         ttk.Label(frame, text="Qualidade do sono:").pack(pady=(10,0), anchor='w')
         widgets['sono'] = tk.Text(frame, height=3, width=50)
         widgets['sono'].pack(pady=5, anchor='w')
         ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
 
-        # --- Meta de água ---
+    def _create_common_widgets(self, day):
+        frame = self.day_tabs[day]
+        widgets = self.widgets[day]
         ttk.Label(frame, text="Meta diária de água: 4 litros").pack(pady=(10,0), anchor='w')
         agua_frame = ttk.Frame(frame)
         agua_frame.pack(anchor='w', fill='x')
@@ -184,6 +191,22 @@ class App(tk.Tk):
         ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
 
+    def _create_training_and_flex_widgets(self, day, is_training_day):
+        frame = self.day_tabs[day]
+        widgets = self.widgets[day]
+
+        title_font = ("Helvetica", 12, "bold")
+        ttk.Label(frame, text="TREINO", font=title_font).pack(anchor='w', pady=(10, 5))
+
+        if is_training_day:
+            self._create_training_widgets(day)
+
+        self._create_flex_widgets(day)
+
+    def _create_flex_widgets(self, day):
+        frame = self.day_tabs[day]
+        widgets = self.widgets[day]
+
         # --- 100 flexões ---
         ttk.Label(frame, text="E as 100 flexões?").pack(pady=(10,0), anchor='w')
         flexoes_var = tk.StringVar()
@@ -207,12 +230,9 @@ class App(tk.Tk):
         widgets['flexoes_justificativa'] = tk.Text(justificativa_frame, height=2, width=50)
         widgets['flexoes_justificativa'].pack(pady=5, anchor='w')
 
-
     def _create_training_widgets(self, day):
         frame = self.day_tabs[day]
         widgets = self.widgets[day]
-
-        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=20)
 
         # --- Relato do treino ---
         ttk.Label(frame, text="Relate como foi o seu treino com o personal:").pack(anchor='w')
@@ -254,7 +274,8 @@ class App(tk.Tk):
         frame = self.day_tabs[day]
         widgets = self.widgets[day]
 
-        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=20)
+        title_font = ("Helvetica", 12, "bold")
+        ttk.Label(frame, text="PESO", font=title_font).pack(anchor='w', pady=(10, 5))
 
         # --- Peso em jejum ---
         ttk.Label(frame, text="Qual foi o peso em jejum?").pack(anchor='w')
@@ -276,11 +297,59 @@ class App(tk.Tk):
 
     def _save_data(self, notebook):
         selected_day_index = notebook.index(notebook.select())
-        day = self.days[selected_day_index] # Use the stored full day names
-
-        data = {}
+        day = self.days[selected_day_index]
         day_widgets = self.widgets[day]
 
+        # --- Validation ---
+        is_valid = True
+        error_messages = []
+
+        # Sono
+        if not day_widgets['sono'].get('1.0', tk.END).strip():
+            is_valid = False
+            error_messages.append("- Qualidade do Sono")
+
+        # Metas (Água, Chá) - Assuming 0 is not a valid entry
+        if day_widgets['agua_var'].get() == 0.0:
+            is_valid = False
+            error_messages.append("- Meta de Água")
+        if day_widgets['cha_var'].get() == 0.0:
+            is_valid = False
+            error_messages.append("- Meta de Chá")
+
+        # Dieta
+        for meal, options in day_widgets['dieta'].items():
+            for option, combo in options.items():
+                if not combo.get():
+                    is_valid = False
+                    error_messages.append(f"- {meal}: {option}")
+
+        # Treino (if applicable)
+        if day in ["Segunda-feira", "Quarta-feira", "Sexta-feira"]:
+            if not day_widgets['treino_relato'].get('1.0', tk.END).strip():
+                is_valid = False
+                error_messages.append("- Relato do Treino")
+            if not day_widgets['treino_carga'].get():
+                 is_valid = False
+                 error_messages.append("- Progressão de Carga")
+
+        # Flexões Justificativa (if applicable)
+        if day_widgets['flexoes_var'].get() == 'nao' and not day_widgets['flexoes_justificativa'].get('1.0', tk.END).strip():
+            is_valid = False
+            error_messages.append("- Justificativa das Flexões")
+
+        # Peso (if applicable)
+        if day == "Sexta-feira":
+            if not day_widgets['peso'].get().strip():
+                is_valid = False
+                error_messages.append("- Peso em Jejum")
+
+        if not is_valid:
+            messagebox.showerror("Campos Obrigatórios", "Por favor, preencha todos os campos antes de salvar:\n\n" + "\n".join(error_messages))
+            return
+
+        # --- Data Collection ---
+        data = {}
         # Common widgets
         data['sono'] = day_widgets['sono'].get('1.0', tk.END).strip()
         data['agua'] = day_widgets['agua_var'].get()
@@ -420,8 +489,18 @@ class App(tk.Tk):
 
         sorted_dates = sorted(all_data.keys(), reverse=True)
 
+        day_map = {0: "SEG", 1: "TER", 2: "QUA", 3: "QUI", 4: "SEX", 5: "SÁB", 6: "DOM"}
+
         for date_str in sorted_dates:
-            btn = ttk.Button(scrollable_frame, text=date_str, style="Bold.TButton",
+            try:
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                day_of_week = day_map[date_obj.weekday()]
+                formatted_date = date_obj.strftime('%d/%m/%Y')
+                button_text = f"{day_of_week} - {formatted_date}"
+            except ValueError:
+                button_text = date_str # Fallback for old format
+
+            btn = ttk.Button(scrollable_frame, text=button_text, style="Bold.TButton",
                              command=lambda d=date_str, data=all_data[date_str]: self._show_history_details(d, data))
             btn.pack(pady=5, padx=10, fill='x')
 
