@@ -755,10 +755,12 @@ def enviar_email_label(label, df, usuario):
         time.sleep(0.25)
         assinatura_html = mail.HTMLBody or ""
         corpo_html = (
-            "<html><body style='font-family: Calibri; font-size: 11pt;'>"
+            "<html><body>"
+            "<div style='font-family: Calibri; font-size: 11pt;'>"
             "<p>Bom dia,</p>"
             "<p>Segue listagem de funcionários que estão Ativos em nosso sistema. "
             "Por gentileza confirmar se a listagem está correta, conferindo Nome, Cargo e Situação (Ativo/Afastado/Pendente).</p>"
+            "</div>"
             "</body></html>"
         )
         mail.HTMLBody = corpo_html + assinatura_html
@@ -860,8 +862,10 @@ def cobrar_email_label(label, df, usuario):
         if email_cc:
             reply.CC = email_cc
         corpo_cobranca = (
-            "<html><body style='font-family: Calibri; font-size: 11pt;'>"
+            "<html><body>"
+            "<div style='font-family: Calibri; font-size: 11pt;'>"
             "<p>Prezados,</p><p>Algum retorno?</p>"
+            "</div>"
             "</body></html>"
         )
         reply.HTMLBody = corpo_cobranca + (reply.HTMLBody or "")
@@ -2501,7 +2505,8 @@ def enviar_email_procuracao(empresa, df, usuario):
         # Monta o corpo do e-mail com a formatação especificada
         corpo_html = f"""
 <html>
-<body style='font-family: Calibri; font-size: 11pt;'>
+<body>
+<div style='font-family: Calibri; font-size: 11pt;'>
 <p>Prezados,</p>
 <p>A procuração eletrônica para acesso ao E-Social está vencida. Solicitamos, por gentileza, a renovação para que possamos continuar efetuando os envios ao sistema.</p>
 <p>Essa renovação é feita no site do <a href="https://cav.receita.fazenda.gov.br/autenticacao/login">E-CAC</a>, seguem instruções:</p>
@@ -2514,6 +2519,7 @@ def enviar_email_procuracao(empresa, df, usuario):
 </ol>
 <p><b>Vigência de 2 ou mais anos.</b></p>
 <p><span style='background-color: yellow;'><b>CNPJ OSWALDO CRUZ: 18.802.823/0001-04</b></span></p>
+</div>
 </body>
 </html>
 """
