@@ -14,6 +14,9 @@ class App(tk.Tk):
         # --- Style ---
         self.style = ttk.Style(self)
         self.style.configure("Bold.TButton", font=("Helvetica", 10, "bold"))
+        self.style.configure("Error.TCombobox", fieldbackground="red")
+        self.style.map("Error.TCombobox", fieldbackground=[("readonly", "red")])
+        self.style.configure("Error.TEntry", fieldbackground="red")
 
         self.create_main_menu()
         self._center_window(self, 900, 700)
@@ -188,7 +191,6 @@ class App(tk.Tk):
                               command=lambda v, lbl=cha_label, var=cha_var: self._update_float_scale(v, lbl, var, "L"))
         cha_scale.pack(side='left', pady=5, fill='x', expand=True)
         cha_label.pack(side='left', padx=5)
-        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
 
     def _create_training_and_flex_widgets(self, day, is_training_day):
@@ -300,6 +302,17 @@ class App(tk.Tk):
         day = self.days[selected_day_index]
         day_widgets = self.widgets[day]
 
+        # --- Reset all styles first ---
+        day_widgets['sono'].config(highlightbackground="grey", highlightcolor="grey", highlightthickness=1)
+        day_widgets['treino_relato'].config(highlightbackground="grey", highlightcolor="grey", highlightthickness=1) if 'treino_relato' in day_widgets else None
+        day_widgets['flexoes_justificativa'].config(highlightbackground="grey", highlightcolor="grey", highlightthickness=1) if 'flexoes_justificativa' in day_widgets else None
+        if day == "Sexta-feira":
+            day_widgets['peso'].config(style="TEntry")
+        for meal, options in day_widgets['dieta'].items():
+            for option, combo in options.items():
+                combo.config(style="TCombobox")
+
+
         # --- Validation ---
         is_valid = True
         error_messages = []
@@ -308,6 +321,7 @@ class App(tk.Tk):
         if not day_widgets['sono'].get('1.0', tk.END).strip():
             is_valid = False
             error_messages.append("- Qualidade do Sono")
+            day_widgets['sono'].config(highlightbackground="red", highlightcolor="red", highlightthickness=1)
 
         # Metas (Água, Chá) - Assuming 0 is not a valid entry
         if day_widgets['agua_var'].get() == 0.0:
@@ -323,29 +337,33 @@ class App(tk.Tk):
                 if not combo.get():
                     is_valid = False
                     error_messages.append(f"- {meal}: {option}")
+                    combo.config(style="Error.TCombobox")
 
         # Treino (if applicable)
         if day in ["Segunda-feira", "Quarta-feira", "Sexta-feira"]:
             if not day_widgets['treino_relato'].get('1.0', tk.END).strip():
                 is_valid = False
                 error_messages.append("- Relato do Treino")
+                day_widgets['treino_relato'].config(highlightbackground="red", highlightcolor="red", highlightthickness=1)
             if not day_widgets['treino_carga'].get():
                  is_valid = False
-                 error_messages.append("- Progressão de Carga")
+                 error_messages.append("- Progressão de Carga") # No visual feedback for radio buttons, msg is enough
 
         # Flexões Justificativa (if applicable)
         if day_widgets['flexoes_var'].get() == 'nao' and not day_widgets['flexoes_justificativa'].get('1.0', tk.END).strip():
             is_valid = False
             error_messages.append("- Justificativa das Flexões")
+            day_widgets['flexoes_justificativa'].config(highlightbackground="red", highlightcolor="red", highlightthickness=1)
 
         # Peso (if applicable)
         if day == "Sexta-feira":
             if not day_widgets['peso'].get().strip():
                 is_valid = False
                 error_messages.append("- Peso em Jejum")
+                day_widgets['peso'].config(style="Error.TEntry")
 
         if not is_valid:
-            messagebox.showerror("Campos Obrigatórios", "Por favor, preencha todos os campos antes de salvar:\n\n" + "\n".join(error_messages))
+            messagebox.showerror("Campos Obrigatórios", "Faltam informações a serem preenchidas:\n\n" + "\n".join(error_messages))
             return
 
         # --- Data Collection ---
@@ -379,6 +397,14 @@ class App(tk.Tk):
         # Save data
         file_path = '.foco_data.json'
         all_data = {}
+
+        # Un-hide the file on Windows before writing
+        if os.name == 'nt' and os.path.exists(file_path):
+            try:
+                os.system(f'attrib -h "{file_path}"')
+            except Exception as e:
+                print(f"Não foi possível desocultar o arquivo para escrita: {e}")
+
         if os.path.exists(file_path):
             with open(file_path, 'r') as f:
                 try:
@@ -394,12 +420,12 @@ class App(tk.Tk):
         with open(file_path, 'w') as f:
             json.dump(all_data, f, indent=4)
 
-        # Hide the file on Windows
+        # Re-hide the file on Windows after writing
         if os.name == 'nt':
             try:
                 os.system(f'attrib +h "{file_path}"')
             except Exception as e:
-                print(f"Não foi possível ocultar o arquivo: {e}")
+                print(f"Não foi possível ocultar o arquivo após escrita: {e}")
 
         messagebox.showinfo("Sucesso", "Informações salvas com sucesso!")
 
@@ -415,7 +441,7 @@ class App(tk.Tk):
 
         diet_options = {
             "Café da manhã": [
-                ("Pão:", ["2 fatias de pão de forma", "1 pão francês"]),
+                ("Carboidrato:", ["2 fatias de pão de forma", "1 pão francês"]),
                 ("Proteína:", ["1 ovo", "2 fatias de muçarela"]),
                 ("Fruta:", ["100g de uva", "100g de mamão", "100g de abacaxi", "150g de melancia", "150g de melão", "150g de morango", "100g de jabuticaba"])
             ],
@@ -429,7 +455,8 @@ class App(tk.Tk):
             "Lanche da tarde": [
                 ("Base:", ["200g de iogurte natural desnatado", "220ml de leite desnatado"]),
                 ("Fibra:", ["10g de psyllium"]),
-                ("Complemento:", ["100g de morango", "70g de uva", "50g de whey"])
+                ("Proteína:", ["50g de whey"]),
+                ("Fruta:", ["100g de morango", "70g de uva"])
             ],
             "Jantar": [
                 ("Carboidrato:", ["50g de arroz", "50g de macarrão", "120g de batata"]),
@@ -447,6 +474,7 @@ class App(tk.Tk):
             for i, (label_text, option_list) in enumerate(options):
                 ttk.Label(meal_frame, text=label_text).grid(row=i, column=0, sticky='w', padx=5, pady=5)
                 combo = ttk.Combobox(meal_frame, values=option_list, state="readonly")
+                combo.bind("<MouseWheel>", lambda e: "break")
                 combo.grid(row=i, column=1, sticky='ew', padx=5, pady=5)
                 meal_frame.grid_columnconfigure(1, weight=1)
                 widgets['dieta'][meal][label_text.replace(":", "")] = combo
