@@ -603,15 +603,21 @@ class App(tk.Tk):
                 'items': {}
             }
 
-            def toggle_meal_frame(p_var, m_frame, j_frame):
+            # Create a list to hold the item frames for easy access in the toggle function
+            item_frames = []
+
+            def toggle_meal_frame(p_var, i_frames, j_frame):
                 if p_var.get():
-                    m_frame.pack_forget()
+                    for item in i_frames:
+                        item.pack_forget()
                     j_frame.pack(fill='x', expand=True)
                 else:
-                    m_frame.pack(fill='x', expand=True)
                     j_frame.pack_forget()
+                    for item in i_frames:
+                        item.pack(fill='x', expand=True, pady=5)
 
-            pulei_check.config(command=lambda p=pulei_var, m=meal_frame, j=justificativa_pulei_frame: toggle_meal_frame(p, m, j))
+            # This command will be configured later, after the item_frames list is populated
+            pulei_check.config(command=lambda p=pulei_var, i_f=item_frames, j=justificativa_pulei_frame: toggle_meal_frame(p, i_f, j))
 
             meal_frame.pack(fill='x', expand=True) # Initially visible
 
@@ -620,6 +626,7 @@ class App(tk.Tk):
 
                 item_frame = ttk.Frame(meal_frame)
                 item_frame.pack(fill='x', expand=True, pady=5)
+                item_frames.append(item_frame) # Add the frame to the list
 
                 ttk.Label(item_frame, text=label_text).pack(anchor='w')
                 combo = ttk.Combobox(item_frame, values=option_list_ext, state="readonly", width=30)
