@@ -76,7 +76,7 @@ class App(tk.Tk):
             # Store the date against the tab's ID (which is the frame itself)
             self.tab_dates[str(tab_frame)] = date_str_save
 
-            if current_day_date.date() > today.date():
+            if current_day_date.date() >= today.date():
                 notebook.tab(tab_frame, state='disabled')
 
             # Create a canvas and a scrollbar inside the container frame
@@ -589,7 +589,7 @@ class App(tk.Tk):
 
             pulei_var = tk.BooleanVar()
             pulei_check = ttk.Checkbutton(meal_frame, text="Pulei esta refeição.", variable=pulei_var)
-            pulei_check.pack(anchor='w', pady=5)
+            pulei_check.pack(anchor='w', pady=5, fill='x')
 
             justificativa_pulei_frame = ttk.Frame(meal_container)
             ttk.Label(justificativa_pulei_frame, text="Justifique-se:").pack(anchor='w')
@@ -619,8 +619,7 @@ class App(tk.Tk):
                 option_list_ext = option_list + ["Nenhum", "Outra"]
 
                 item_frame = ttk.Frame(meal_frame)
-                item_frame.grid(row=i, column=0, columnspan=2, sticky='ew', pady=5)
-                meal_frame.grid_columnconfigure(1, weight=1)
+                item_frame.pack(fill='x', expand=True, pady=5)
 
                 ttk.Label(item_frame, text=label_text).pack(anchor='w')
                 combo = ttk.Combobox(item_frame, values=option_list_ext, state="readonly", width=30)
