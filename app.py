@@ -76,6 +76,9 @@ class App(tk.Tk):
             # Store the date against the tab's ID (which is the frame itself)
             self.tab_dates[str(tab_frame)] = date_str_save
 
+            if current_day_date.date() > today.date():
+                notebook.tab(tab_frame, state='disabled')
+
             # Create a canvas and a scrollbar inside the container frame
             canvas = tk.Canvas(tab_frame, highlightthickness=0)
             scrollbar = ttk.Scrollbar(tab_frame, orient="vertical", command=canvas.yview)
@@ -127,14 +130,15 @@ class App(tk.Tk):
             try:
                 # Check if notebook still exists to prevent errors on window close
                 if not notebook.winfo_exists():
-                    return
+                    return "break"
                 active_tab_widget = notebook.nametowidget(notebook.select())
                 if active_tab_widget.winfo_children():
                     canvas = active_tab_widget.winfo_children()[0]
                     canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                return "break"
             except (tk.TclError, AttributeError):
                 # This can happen if the widget is in the process of being destroyed
-                pass
+                return "break"
 
         # Bind globally, but we will manage it with on_close
         self.bind_all("<MouseWheel>", _universal_scroll)
@@ -371,9 +375,9 @@ class App(tk.Tk):
         day_widgets['flexoes_justificativa'].config(highlightbackground="grey", highlightcolor="grey", highlightthickness=1) if 'flexoes_justificativa' in day_widgets else None
         if day == "Sexta-feira":
             day_widgets['peso'].config(style="TEntry")
-        for meal, options in day_widgets['dieta'].items():
-            for option, combo in options.items():
-                combo.config(style="TCombobox")
+        for meal_data in day_widgets['dieta'].values():
+            for item_widgets in meal_data['items'].values():
+                item_widgets['combo'].config(style="TCombobox")
 
 
         # --- Validation ---
@@ -584,7 +588,7 @@ class App(tk.Tk):
             meal_frame = ttk.LabelFrame(meal_container, text=meal, padding=10)
 
             pulei_var = tk.BooleanVar()
-            pulei_check = ttk.Checkbutton(meal_container, text="Pulei esta refeição.", variable=pulei_var)
+            pulei_check = ttk.Checkbutton(meal_frame, text="Pulei esta refeição.", variable=pulei_var)
             pulei_check.pack(anchor='w', pady=5)
 
             justificativa_pulei_frame = ttk.Frame(meal_container)
@@ -730,6 +734,7 @@ class App(tk.Tk):
 
         def _details_scroll(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            return "break"
 
         details_window.bind_all("<MouseWheel>", _details_scroll)
 
