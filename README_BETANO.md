@@ -4,9 +4,10 @@ Este script foi desenvolvido para auxiliar apostadores iniciantes com perfil **c
 
 ## Funcionalidades
 - **Interface Gráfica:** Fácil de usar, permitindo inserir sua banca e meta diária.
-- **Análise Inteligente:** Filtra jogos com odds seguras (entre 1.20 e 1.50) para apostas simples.
-- **Duplas Seguras:** Combina jogos de odds muito baixas (ex: 1.10) para criar bilhetes com maior retorno e baixo risco.
-- **Gestão de Banca:** Sugere automaticamente o valor da aposta (stake) baseado em 2% da sua banca.
+- **Mercados Ampliados:** Agora analisa mercados de **Vencedor (1X2)** e **Gols (Mais de 1.5/2.5)**.
+- **Duplas Seguras:** Combina jogos de favoritismo extremo para criar bilhetes consistentes.
+- **Gestão Realista:** Permite definir uma **Stake Mínima** (ex: R$ 2,00) para atingir sua meta mais rápido.
+- **Sistema de Aprendizado:** O agente possui um módulo de estudo. Ao marcar "Green" ou "Red", ele registra a assertividade e "aprende" quais padrões estão funcionando melhor para você.
 - **Monitoramento Contínuo:** Opção de atualizar automaticamente os jogos a cada 5 minutos.
 
 ## Como Instalar e Rodar
@@ -31,7 +32,9 @@ python betano_agent.py
 ## Como usar
 1. Insira o valor total que você tem na banca (ex: 100.00).
 2. Insira quanto você quer ganhar hoje (Meta).
-3. Clique em **Analisar Oportunidades**.
+3. Defina sua **Stake Mínima** (quanto você quer apostar por vez no mínimo).
+4. Clique em **Analisar Agora**.
+5. Após fazer sua aposta e o jogo acabar, use os botões **Green ✅** ou **Red ❌** para o agente estudar os resultados.
 4. O Agente mostrará os melhores jogos e mercados (geralmente Vitória do Favorito).
 5. Se quiser que o robô fique vigiando o site sozinho, marque a caixa **Monitoramento Contínuo**.
 
