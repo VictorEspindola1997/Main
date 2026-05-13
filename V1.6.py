@@ -873,8 +873,9 @@ class App:
         self.overlay_login = ctk.CTkFrame(self.root, fg_color="transparent")
         self.overlay_login.place(relx=0, rely=0, relwidth=1, relheight=1)
 
-        login_container = ctk.CTkFrame(self.overlay_login, corner_radius=15)
-        login_container.place(relx=0.5, rely=0.5, anchor="center", width=450, height=450)
+        login_container = ctk.CTkFrame(self.overlay_login, width=450, height=450, corner_radius=15)
+        login_container.pack_propagate(False)
+        login_container.place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(login_container, text="E.A.I.", font=ctk.CTkFont(family=FONT_FAMILY, size=32, weight="bold"), text_color="#2C3E50").pack(pady=(30, 5))
         ctk.CTkLabel(login_container, text="Acesso ao Sistema", font=FONT_LABEL, text_color="#7F8C8D").pack(pady=(0, 25))
