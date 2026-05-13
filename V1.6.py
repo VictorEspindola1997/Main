@@ -67,7 +67,7 @@ FONT_ENTRY = (FONT_FAMILY, 13)
 FONT_LABEL = (FONT_FAMILY, 15)
 FONT_BUTTON = (FONT_FAMILY, 14, "bold")
 FONT_FORGOT_PASSWORD = (FONT_FAMILY, 14, "underline")
-FONT_TITLE = (FONT_FAMILY, 24, "bold")
+FONT_TITLE = (FONT_FAMILY, 26, "bold")
 
 MAX_LINHAS_COLUNA = 5
 IDX_AK_LABEL = 36
@@ -103,34 +103,45 @@ def unhide_file(file_path):
         pass
 
 def normalize_key(s: str) -> str:
-    if s is None: return ""
+    if s is None:
+        return ""
     s = str(s)
     s = unicodedata.normalize("NFD", s)
-    return "".join(ch for ch in s if not unicodedata.combining(ch)).lower()
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return s.lower()
 
 def safe_email_field(val) -> str:
-    if val is None: return ""
+    if val is None:
+        return ""
     try:
-        if isinstance(val, float) and pd.isna(val): return ""
-    except Exception: pass
+        if isinstance(val, float) and pd.isna(val):
+            return ""
+    except Exception:
+        pass
     s = str(val).strip()
-    if s.lower() in {"nan", "none", "null", ""}: return ""
+    if s.lower() in {"nan", "none", "null", ""}:
+        return ""
     return s
 
 def limpar_caminho(p: str) -> str:
-    if p is None: return ""
-    return str(p).strip().strip('"').strip("'")
+    if p is None:
+        return ""
+    s = str(p).strip().strip('"').strip("'")
+    return s
 
 def extrair_nome_empresa_do_arquivo(caminho: str) -> str:
     nome = os.path.basename(caminho)
     nome = re.sub(r"(?i)listagem de funcionarios\s*-\s*", "", nome)
-    return re.sub(r"\.(xlsx|xlsm|xls)$", "", nome, flags=re.I).strip()
+    nome = re.sub(r"\.(xlsx|xlsm|xls)$", "", nome, flags=re.I)
+    return nome.strip()
 
 def centralizar_janela(janela, largura=850, altura=700):
     janela.update_idletasks()
     x = (janela.winfo_screenwidth() // 2) - (largura // 2)
     y = (janela.winfo_screenheight() // 2) - (altura // 2)
     janela.geometry(f"{largura}x{altura}+{x}+{y}")
+
+# ================== LÓGICA DE NEGÓCIO ORIGINAIS (Selenium / Excel / Outlook) ==================
 
 def carregar_controle(usuario):
     if usuario == "thailany":
@@ -183,18 +194,18 @@ def get_anexos_from_row(row, usuario):
         raw = str(row.iloc[IDX_AL_ANEXOS])
     except Exception:
         raw = ""
-    if not raw or raw.lower() in {"nan", "none"}: return []
+    if not raw or raw.lower() in {"nan", "none"}:
+        return []
     parts = re.split(r"[;,]", raw)
     anexos = []
     for p in parts:
-        p_clean = limpar_caminho(p)
-        if p_clean and os.path.isfile(p_clean):
-            anexos.append(p_clean)
+        p_c = limpar_caminho(p)
+        if p_c and os.path.isfile(p_c):
+            anexos.append(p_c)
     return anexos
 
 def get_assunto_from_row(row):
     try:
-        if IDX_AM_ASSUNTO >= len(row): return ""
         return safe_email_field(row.iloc[IDX_AM_ASSUNTO])
     except Exception:
         return ""
@@ -203,11 +214,6 @@ def listar_labels(df):
     labels = list(df.iloc[2:, IDX_AK_LABEL].dropna().astype(str))
     labels.sort(key=normalize_key)
     return labels
-
-def abrir_link_ajuda(event=None):
-    webbrowser.open("https://wa.me/551221239207?text=Encontrei%20um%20erro%20no%20sistema%20E.A.I.%20Pode%20me%20ajudar%3F")
-
-# ================== LÓGICA DE NEGÓCIO ORIGINAIS (Selenium / Excel / Outlook) ==================
 
 def executar_gerar_planilha(app_usuario, soc_usuario, soc_senha, soc_id, app_instance, btn_widget, status_banner):
     if app_usuario == "thailany":
@@ -295,8 +301,10 @@ def executar_gerar_planilha(app_usuario, soc_usuario, soc_senha, soc_id, app_ins
                     divs = driver.find_elements(By.CSS_SELECTOR, "div.div-download")
                     for div in divs:
                         match = re.search(r"(\d+)-download", div.get_attribute("id"))
-                        if match and int(match.group(1)) > maior_id:
-                            maior_id, div_maior = int(match.group(1)), div
+                        if match:
+                            id_num = int(match.group(1))
+                            if id_num > maior_id:
+                                maior_id, div_maior = id_num, div
                     if div_maior:
                         div_maior.find_element(By.TAG_NAME, "a").click()
                         download_found = True
@@ -381,13 +389,13 @@ def executar_gerar_planilha(app_usuario, soc_usuario, soc_senha, soc_id, app_ins
         if btn_widget: app_instance.root.after(0, btn_widget.pack_forget)
 
     except Exception as e:
-        messagebox.showerror("Erro", f"Falha ao gerar planilha: {e}")
+        messagebox.showerror("Erro", str(e))
     finally:
         driver.quit(); pythoncom.CoUninitialize()
         if status_banner: app_instance.root.after(0, status_banner.destroy)
         shutil.rmtree(temp_profile_dir, ignore_errors=True)
 
-# ================== INTERFACE (UI CUSTOMTKINTER) ==================
+# ================== APLICAÇÃO (UI CUSTOMTKINTER) ==================
 
 class App:
     def __init__(self, root):
@@ -418,16 +426,16 @@ class App:
             state = win32api.GetKeyState(win32con.VK_CAPITAL) & 1
             for lbl in self.caps_lock_labels:
                 try: lbl.configure(text="CAPS LOCK ATIVADA" if state else "")
-                except: pass
+                except Exception: pass
         except Exception: pass
         self.root.after(500, self.check_caps_lock)
 
-    def clear_screen(self):
+    def clean_main_frame(self):
         for w in self.main_container.winfo_children(): w.destroy()
         self.caps_lock_labels = []
 
     def tela_login(self):
-        self.clear_screen()
+        self.clean_main_frame()
         self.root.geometry("850x700"); centralizar_janela(self.root, 850, 700); self.root.deiconify()
 
         container = ctk.CTkFrame(self.main_container, width=600, height=580, corner_radius=25)
@@ -435,37 +443,26 @@ class App:
         container.place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(container, text="E.A.I.", font=FONT_TITLE).pack(pady=(50, 10))
-        ctk.CTkLabel(container, text="E-Social Artificial Intelligence", font=FONT_LABEL).pack(pady=(0, 50))
+        ctk.CTkLabel(container, text="Acesso ao Sistema", font=FONT_LABEL).pack(pady=(0, 50))
 
-        self.u_ent = ctk.CTkEntry(container, placeholder_text="Usuário", font=FONT_ENTRY, width=420, height=55)
-        self.u_ent.pack(pady=15)
-
+        self.u_ent = ctk.CTkEntry(container, placeholder_text="Usuário", font=FONT_ENTRY, width=420, height=55); self.u_ent.pack(pady=15)
         sf = ctk.CTkFrame(container, fg_color="transparent"); sf.pack(pady=15)
-        self.s_ent = ctk.CTkEntry(sf, placeholder_text="Senha", show="*", font=FONT_ENTRY, width=420, height=55)
-        self.s_ent.pack(side="left")
-
-        self.eye = ctk.CTkLabel(sf, text="🔒", font=("Segoe UI Emoji", 22), cursor="hand2")
-        self.eye.place(relx=0.92, rely=0.5, anchor="center")
-        self.eye.bind("<Button-1>", self.toggle_pass)
-
-        cl = ctk.CTkLabel(container, text="", font=(FONT_FAMILY, 13), text_color="#E74C3C")
-        cl.pack(pady=5); self.caps_lock_labels.append(cl)
-
-        forgot = ctk.CTkLabel(container, text="Esqueci a minha senha", font=FONT_FORGOT_PASSWORD, text_color="#3498DB", cursor="hand2")
-        forgot.pack(pady=15); forgot.bind("<Button-1>", self.abrir_janela_palavra_seguranca)
-
-        ctk.CTkButton(container, text="ENTRAR", font=FONT_BUTTON, width=420, height=65, corner_radius=12, command=self.validar).pack(pady=35)
+        self.s_ent = ctk.CTkEntry(sf, placeholder_text="Senha", show="*", font=FONT_ENTRY, width=420, height=55); self.s_ent.pack(side="left")
+        self.eye = ctk.CTkLabel(sf, text="🔒", font=("Segoe UI Emoji", 22), cursor="hand2"); self.eye.place(relx=0.92, rely=0.5, anchor="center"); self.eye.bind("<Button-1>", self.toggle_pass)
+        cl = ctk.CTkLabel(container, text="", font=(FONT_FAMILY, 13), text_color="#E74C3C"); cl.pack(pady=5); self.caps_lock_labels.append(cl)
+        l_forgot = ctk.CTkLabel(container, text="Esqueci a minha senha", font=FONT_FORGOT_PASSWORD, text_color="#3498DB", cursor="hand2")
+        l_forgot.pack(pady=15); l_forgot.bind("<Button-1>", self.abrir_janela_palavra_seguranca)
+        ctk.CTkButton(container, text="ENTRAR", font=FONT_BUTTON, width=420, height=65, corner_radius=12, command=self.validar_login).pack(pady=35)
 
         self.u_ent.bind("<Return>", lambda e: self.s_ent.focus_set())
-        self.s_ent.bind("<Return>", lambda e: self.validar())
-        self.u_ent.focus_set()
+        self.s_ent.bind("<Return>", lambda e: self.validar_login()); self.u_ent.focus_set()
 
     def toggle_pass(self, e=None):
         self.password_visible = not self.password_visible
         self.s_ent.configure(show="" if self.password_visible else "*")
         self.eye.configure(text="🔓" if self.password_visible else "🔒")
 
-    def validar(self):
+    def validar_login(self):
         u, s = self.u_ent.get().strip().lower(), self.s_ent.get().strip()
         users = {"victor": "1001", "thailany": "1001"}
         if u in users and s == users[u]:
@@ -488,7 +485,7 @@ class App:
         return str(row.iloc[IDX_AA_STATUS]).strip().upper() == "OK" if row is not None else False
 
     def tela_inicial(self):
-        self.clear(); self.root.geometry("1100x900"); centralizar_janela(self.root, 1100, 900); self.root.deiconify()
+        self.clean_main_frame(); self.root.geometry("1100x900"); centralizar_janela(self.root, 1100, 900); self.root.deiconify()
         ctk.CTkLabel(self.main_container, text="MENU DE OPÇÕES", font=FONT_TITLE, text_color="#2C3E50").pack(pady=50)
         btns_frame = ctk.CTkFrame(self.main_container, fg_color="transparent"); btns_frame.pack(expand=True)
 
@@ -513,7 +510,7 @@ class App:
                 with open(f, "r") as file:
                     d = datetime.strptime(file.read().strip(), "%d/%m/%Y")
                     return d.month == datetime.now().month and d.year == datetime.now().year
-            except: pass
+            except Exception: pass
         return False
 
     def confirmar_saida(self):
@@ -529,7 +526,7 @@ class App:
         def go():
             if not (u.get() and s.get() and i.get()): return
             win.destroy(); b = self.mostrar_banner("PROCESSO DE GERAÇÃO INICIADO...")
-            threading.Thread(target=executar_gerar_planilha, args=(self.usuario_atual, u.get(), s.get(), i.get(), self, None, b), daemon=True).start()
+            threading.Thread(target=executar_gerar_planilha, args=(self.usuario_atual, u.get().strip(), s.get().strip(), i.get().strip(), self, None, b), daemon=True).start()
         ctk.CTkButton(f, text="GERAR PLANILHA", font=FONT_BUTTON, width=450, height=60, corner_radius=12, command=go).pack(pady=45)
 
     def mostrar_banner(self, text, color="#D6EAF8", t_color="#1B4F72"):
@@ -540,30 +537,30 @@ class App:
         banner = self.mostrar_banner("ANALISANDO E-MAILS...", "#D5F5E3", "#145A32")
         try:
             pythoncom.CoInitialize()
-            acc_mail = EMAIL_PLANILHAS_THAILANY if self.usuario_atual == "thailany" else EMAIL_CONTA_PADRAO_VICTOR
+            acc_m = EMAIL_PLANILHAS_THAILANY if self.usuario_atual == "thailany" else EMAIL_CONTA_PADRAO_VICTOR
             dest = PASTA_PLANILHAS_THAILANY if self.usuario_atual == "thailany" else PASTA_PLANILHAS_VICTOR
             outlook = win32.Dispatch("Outlook.Application"); ns = outlook.GetNamespace("MAPI"); inbox = None
             for acc in ns.Accounts:
-                if acc.SmtpAddress.lower() == acc_mail.lower(): inbox = acc.DeliveryStore.GetDefaultFolder(6); break
-            if not inbox: raise Exception(f"Conta {acc_mail} não encontrada.")
+                if str(acc.SmtpAddress).lower() == acc_m.lower(): inbox = acc.DeliveryStore.GetDefaultFolder(6); break
+            if not inbox: raise Exception(f"Conta {acc_m} não encontrada.")
             items = inbox.Items; items.Sort("[ReceivedTime]", True); os.makedirs(dest, exist_ok=True)
-            rel = [i for i in items if "listagem de funcionarios" in normalize_key(i.Subject or "") and i.Attachments.Count > 0]
-            total, baixar_list = 0, []
+            relevant = [i for i in items if "listagem de funcionarios" in normalize_key(i.Subject or "") and i.Attachments.Count > 0]
+            total, bl = 0, []
             ts = os.path.join(dest, "temp_scan"); os.makedirs(ts, exist_ok=True)
-            for i in rel:
-                for a in i.Attachments:
+            for itm in relevant:
+                for a in itm.Attachments:
                     if a.FileName.lower().endswith(".zip"):
                         tp = os.path.join(ts, a.FileName); a.SaveAsFile(tp)
                         with zipfile.ZipFile(tp, 'r') as zr: total += len([f for f in zr.namelist() if f.lower().endswith(".xlsx")])
-                        baixar_list.append((i, a)); os.remove(tp)
+                        bl.append((itm, a)); os.remove(tp)
             shutil.rmtree(ts); self.root.after(0, lambda: banner.label.configure(text=f"PLANILHAS SALVAS: 0 DE {total}"))
             count = 0
-            for itm, att in baixar_list:
+            for itm, att in bl:
                 nb = re.sub(r'[<>:"/\\|?*]', '', itm.Subject).strip(); cz = os.path.join(dest, att.FileName); att.SaveAsFile(cz)
                 with zipfile.ZipFile(cz, 'r') as zr:
                     for zi in [f for f in zr.namelist() if f.lower().endswith(".xlsx")]:
-                        cf = os.path.join(dest, f"{nb}.xlsx"); c = 1
-                        while os.path.exists(cf): cf = os.path.join(dest, f"{nb}_{c}.xlsx"); c += 1
+                        cf = os.path.join(dest, f"{re.sub(r'[<>:\"/\\\\|?*]', '', itm.Subject)}.xlsx"); c = 1
+                        while os.path.exists(cf): cf = os.path.join(dest, f"{re.sub(r'[<>:\"/\\\\|?*]', '', itm.Subject)}_{c}.xlsx"); c += 1
                         with zr.open(zi) as src, open(cf, 'wb') as tgt: shutil.copyfileobj(src, tgt)
                         count += 1; self.root.after(0, lambda c=count: banner.label.configure(text=f"PLANILHAS SALVAS: {c} DE {total}"))
                 os.remove(cz)
@@ -576,13 +573,12 @@ class App:
         banner = self.mostrar_banner("IDENTIFICANDO PLANILHAS...", "#FAD7A0", "#7E5109")
         try:
             pythoncom.CoInitialize(); pasta = PASTA_PLANILHAS_THAILANY if self.usuario_atual == "thailany" else PASTA_PLANILHAS_VICTOR
-            all_files = [f for f in os.listdir(pasta) if f.endswith(".xlsx")]
-            if not all_files: messagebox.showinfo("Aviso", "Vazio."); return
+            files = [f for f in os.listdir(pasta) if f.endswith(".xlsx")]
+            if not files: messagebox.showinfo("Aviso", "Vazio."); return
             ex = win32.Dispatch("Excel.Application"); ex.Visible, ex.DisplayAlerts = False, False; aj = []
-            for f in all_files:
-                try:
-                    wb = ex.Workbooks.Open(os.path.join(pasta, f), ReadOnly=True, Password=""); wb.Close(); aj.append(f)
-                except: continue
+            for f in files:
+                try: wb = ex.Workbooks.Open(os.path.join(pasta, f), ReadOnly=True, Password=""); wb.Close(); aj.append(f)
+                except Exception: continue
             ex.Quit(); total = len(aj); self.root.after(0, lambda: banner.label.configure(text=f"PLANILHAS AJUSTADAS: 0 DE {total}"))
             hj, cnt = datetime.now(), 0
             for f in aj:
@@ -596,13 +592,15 @@ class App:
                                 try:
                                     if not isinstance(dt, datetime): dt = datetime.strptime(str(dt), "%d/%m/%Y")
                                     if dt.month == hj.month and dt.year == hj.year: delr.append(r)
-                                except: pass
+                                except Exception: pass
                     for r in sorted(delr, reverse=True): ws.delete_rows(r, 1)
                     thin = Side(border_style="thin", color="000000"); border = Border(top=thin, left=thin, right=thin, bottom=thin)
                     for r in range(1, ws.max_row+1):
                         for c in range(1, ws.max_column+1):
                             if not any(r >= m.min_row and r <= m.max_row and c >= m.min_col and c <= m.max_col for m in mrg):
                                 cell = ws.cell(r, c); cell.border = border; cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                                if c == 7: cell.number_format = 'DD/MM/YYYY'
+                                else: cell.number_format = '@'
                 wb.save(p); cnt += 1; self.root.after(0, lambda c=cnt: banner.label.configure(text=f"PLANILHAS AJUSTADAS: {c} DE {total}"))
             ex = win32.Dispatch("Excel.Application"); ex.Visible, ex.DisplayAlerts = False, False
             for f in aj:
@@ -610,15 +608,16 @@ class App:
                     wb = ex.Workbooks.Open(os.path.join(pasta, f))
                     for ws in wb.Worksheets: ws.Columns.AutoFit(); ws.Rows.AutoFit(); ws.Protect("spoc")
                     wb.Protect("spoc"); wb.Save(); wb.Close()
-                except: pass
+                except Exception: pass
             ex.Quit()
-            with open(TXT_ULTIMO_AJUSTE, "w") as fl: fl.write(hj.strftime("%d/%m/%Y"))
+            with open(TXT_ULTIMO_AJUSTE, "w") as f_aj:
+                f_aj.write(hj.strftime("%d/%m/%Y"))
             hide_file(TXT_ULTIMO_AJUSTE); messagebox.showinfo("Sucesso", "Concluído.")
         except Exception as e: messagebox.showerror("Erro", str(e))
         finally: banner.destroy(); pythoncom.CoUninitialize()
 
     def tela_envio_cobranca(self):
-        win = ctk.CTkToplevel(self.root); win.title("E.A.I. - ENVIO / COBRANÇA"); win.geometry("650x500"); centralizar_janela(win, 650, 500)
+        win = ctk.CTkToplevel(self.root); win.title("Ação"); win.geometry("650x500"); centralizar_janela(win, 650, 500)
         ctk.CTkLabel(win, text="ESCOLHA A AÇÃO", font=FONT_TITLE).pack(pady=50)
         ctk.CTkButton(win, text="ENVIO", font=FONT_BUTTON, width=450, height=65, command=self.tela_empresas_envio).pack(pady=15)
         ctk.CTkButton(win, text="COBRANÇA", font=FONT_BUTTON, width=450, height=65, fg_color="#8E44AD", command=self.tela_empresas_cobranca).pack(pady=15)
@@ -626,11 +625,12 @@ class App:
 
     def tela_empresas_envio(self):
         win = ctk.CTkToplevel(self.root); win.title("Envio"); win.state('zoomed')
-        top = ctk.CTkFrame(win); top.pack(fill="x", pady=20)
+        top = ctk.CTkFrame(win, fg_color="transparent"); top.pack(fill="x", pady=20)
         ctk.CTkLabel(top, text="ENVIO DA LISTAGEM DE FUNCIONÁRIOS", font=FONT_TITLE).pack()
         regs, hj = carregar_txt(TXT_ENVIO), datetime.now()
         bl = [l for l in self.labels if not (l in regs and datetime.strptime(regs[l], "%d/%m/%Y").month == hj.month) and not self._has_ok_status(l)]
         grid = ctk.CTkScrollableFrame(win, orientation="horizontal"); grid.pack(fill="both", expand=True)
+        self.grid_env = grid
         def send_all():
             for b in [w for w in grid.winfo_children() if isinstance(w, ctk.CTkButton)]:
                 self._exec_env(b.cget("text"), b); time.sleep(0.5)
@@ -643,14 +643,16 @@ class App:
     def _exec_env(self, l, bt):
         s, e = enviar_email_label(l, self.df, self.usuario_atual)
         if s: self.root.after(0, bt.destroy)
+        else: messagebox.showerror("Erro", e)
 
     def tela_empresas_cobranca(self):
         win = ctk.CTkToplevel(self.root); win.title("Cobrança"); win.state('zoomed')
-        top = ctk.CTkFrame(win); top.pack(fill="x", pady=20)
+        top = ctk.CTkFrame(win, fg_color="transparent"); top.pack(fill="x", pady=20)
         ctk.CTkLabel(top, text="COBRANÇA DA LISTAGEM DE FUNCIONÁRIOS", font=FONT_TITLE).pack()
         regs, hj = carregar_txt(TXT_COBRANCA), datetime.now().date()
         bl = [l for l in self.labels if l not in EXCLUIR_NA_COBRANCA and not (l in regs and datetime.strptime(regs[l], "%d/%m/%Y").date() == hj) and not self._has_ok_status(l)]
         grid = ctk.CTkScrollableFrame(win, orientation="horizontal"); grid.pack(fill="both", expand=True)
+        self.grid_cob = grid
         def cob_all():
             for b in [w for w in grid.winfo_children() if isinstance(w, ctk.CTkButton)]:
                 self._exec_cob(b.cget("text"), b); time.sleep(0.5)
@@ -663,10 +665,11 @@ class App:
     def _exec_cob(self, l, bt):
         s, e = cobrar_email_label(l, self.df, self.usuario_atual)
         if s: self.root.after(0, bt.destroy)
+        else: messagebox.showerror("Erro", e)
 
     def tela_procuracoes(self):
         win = ctk.CTkToplevel(self.root); win.title("Procurações"); win.state('zoomed')
-        top = ctk.CTkFrame(win); top.pack(fill="x", pady=20)
+        top = ctk.CTkFrame(win, fg_color="transparent"); top.pack(fill="x", pady=20)
         ctk.CTkLabel(top, text="PROCURAÇÕES VENCIDAS", font=FONT_TITLE).pack()
         hj, regs = datetime.now(), carregar_txt(TXT_PROCURACOES); pl = []
         for _, r in self.df.iloc[2:].iterrows():
@@ -675,7 +678,7 @@ class App:
                 try:
                     if not isinstance(v, datetime): v = datetime.strptime(str(v), "%d/%m/%Y")
                     if v < hj: pl.append(n)
-                except: pass
+                except Exception: pass
         grid = ctk.CTkScrollableFrame(win, orientation="horizontal"); grid.pack(fill="both", expand=True)
         def proc_all():
             for b in [w for w in grid.winfo_children() if isinstance(w, ctk.CTkButton)]:
@@ -689,13 +692,14 @@ class App:
     def _exec_proc(self, n, bt):
         s, e = enviar_email_procuracao(n, self.df, self.usuario_atual)
         if s: self.root.after(0, bt.destroy)
+        else: messagebox.showerror("Erro", e)
 
     def abrir_janela_palavra_seguranca(self, event=None):
-        win = ctk.CTkToplevel(self.root); win.title("Recuperação"); win.geometry("600x500"); centralizar_janela(win, 650, 500); win.after(200, lambda: win.focus())
+        win = ctk.CTkToplevel(self.root); win.title("Recuperação"); win.geometry("650x550"); centralizar_janela(win, 650, 550); win.after(200, lambda: win.focus())
         container = ctk.CTkFrame(win, corner_radius=15); container.pack(expand=True, padx=40, pady=40, fill="both")
         ctk.CTkLabel(container, text="Recuperação de Senha", font=FONT_TITLE).pack(pady=20)
-        u_ent = ctk.CTkEntry(container, placeholder_text="Usuário", width=400, height=50); u_ent.pack(pady=10)
-        p_ent = ctk.CTkEntry(container, placeholder_text="Palavra de Segurança", show="*", width=400, height=50); p_ent.pack(pady=10)
+        u_ent = ctk.CTkEntry(container, placeholder_text="Usuário", font=FONT_ENTRY, width=400, height=50); u_ent.pack(pady=10)
+        p_ent = ctk.CTkEntry(container, placeholder_text="Palavra de Segurança", show="*", font=FONT_ENTRY, width=400, height=50); p_ent.pack(pady=10)
         tries = [3]
         lbl_t = ctk.CTkLabel(container, text=f"TENTATIVAS: {tries[0]}", text_color="red"); lbl_t.pack()
         def check():
@@ -721,8 +725,8 @@ def mostrar_intro(root, callback):
         try:
             img = tk.PhotoImage(file=cp)
             lbl = tk.Label(intro, image=img, bg="white"); lbl.image = img; lbl.pack(expand=True)
-        except Exception: tk.Label(intro, text="CARREGANDO...", font=FONT_TITLE, bg="white").pack(expand=True)
-    else: tk.Label(intro, text="CARREGANDO...", font=FONT_TITLE, bg="white").pack(expand=True)
+        except Exception: tk.Label(intro, text="E.A.I. - CARREGANDO...", font=FONT_TITLE, bg="white").pack(expand=True)
+    else: tk.Label(intro, text="E.A.I. - CARREGANDO...", font=FONT_TITLE, bg="white").pack(expand=True)
     intro.after(2000, lambda: (intro.destroy(), callback()))
 
 if __name__ == "__main__":
